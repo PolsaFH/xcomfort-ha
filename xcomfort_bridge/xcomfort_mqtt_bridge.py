@@ -45,7 +45,7 @@ import scanner
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.1.0"
+BRIDGE_VERSION = "2.1.1"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -1700,6 +1700,15 @@ class Api:
                 item["lagt_til"] = item["id"] in added
         return {"status": SCANNER.status(), "kandidater": cands}
 
+    def _known(self):
+        return (REG["light_ids"] | REG["switch_ids"] | REG["binary_ids"] | REG["sensor_ids"]
+                | REG["thermo_ids"] | set(REG["button_ids"]) | REG["markise_ids"] | set(REG["val_to_light"]))
+
+    def scan_all(self):
+        known = self._known()
+        return [{"id": oid, "navn": name, "type": typ, "kjent": oid in known}
+                for oid, (name, typ) in sorted(SCANNER.objects.items())]
+
     def add_extra(self, body):
         try:
             with open(EXTRA_FILE, encoding="utf-8") as f:
@@ -1713,6 +1722,10 @@ class Api:
         for kind in ("lys", "brytere", "knapper"):
             for oid in body.get(kind, []):
                 item = next((c for c in cands[kind] if c["id"] == int(oid)), None)
+                if item is None and kind == "knapper" and int(oid) in SCANNER.objects:
+                    # Hvilket som helst objekt kan foelges som knapp/hendelse
+                    name = SCANNER.objects[int(oid)][0]
+                    item = {"id": int(oid), "navn": scanner.pretty(name.split("_", 1)[-1]), "objekt": name}
                 if item and not any(x["id"] == item["id"] for x in extra.get(kind, [])):
                     extra.setdefault(kind, []).append(item)
                     added.append(item["navn"])

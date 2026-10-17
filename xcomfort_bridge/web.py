@@ -100,6 +100,8 @@ def make_handler(api):
                     return self._send(200, RAW_RING.since(int(query.get("after", 0))))
                 if path == "/api/devices":
                     return self._send(200, api.devices())
+                if path == "/api/scan/all":
+                    return self._send(200, api.scan_all())
                 if path == "/api/scan":
                     return self._send(200, api.scan_info())
                 if path == "/api/cache":

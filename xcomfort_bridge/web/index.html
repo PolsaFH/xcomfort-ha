@@ -66,7 +66,11 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:6px 4px;
   <div class="tools"><input id="rawfilter" type="search" placeholder="Filtrer, f.eks. et objektnummer …"><label><input type="checkbox" id="rawpause"> Pause</label></div>
   <div class="log"><pre id="rawbox"></pre></div>
 </section>
-<section id="verktoy" hidden></section>
+<section id="verktoy" hidden><div id="vdyn"></div>
+ <div class="grid" style="grid-template-columns:1fr;margin-top:12px"><div class="card"><h3>Alle objekter i Home Manager</h3>
+  <p class="muted">Søk i alt søket fant (navn eller nummer), f.eks. «stue», «BR» eller «kanal». Alt kan legges til som knapp/hendelse.</p>
+  <input id="objsok" placeholder="Søk ..." style="width:100%;max-width:360px"> <a class="btn" href="api/scan/all" download="hm_objekter.json">Last ned hele lista</a>
+  <div id="objres" style="margin-top:8px"></div></div></div></section>
 </main>
 <script>
 const $=s=>document.querySelector(s);
@@ -128,7 +132,7 @@ async function tail(kind,box,filter,pause){
 async function loadTools(){
   const s=await api("api/scan");const c=s.kandidater;
   const list=(arr,kind)=>arr.length?arr.map(x=>`<div class="row"><span class="name">${esc(x.navn)} <small>${esc(x.objekt)} · ${x.id}</small></span>${x.lagt_til?'<small class="state-on">lagt til</small>':`<button class="btn" data-add="${kind}:${x.id}">Legg til i HA</button>`}</div>`).join(""):'<p class="muted">Ingen.</p>';
-  $("#verktoy").innerHTML=`<div class="grid" style="grid-template-columns:1fr">
+  $("#vdyn").innerHTML=`<div class="grid" style="grid-template-columns:1fr">
    <div class="card"><h3>Søk etter nye enheter</h3>
     <p>Går gjennom alle objektene i Home Manager og finner lys, brytere og knapper som broen ikke kjenner til ennå. Tar 10–20 minutter, men påvirker ikke radioen.</p>
     ${s.status.running?`<div class="bar"><div style="width:${Math.round(s.status.progress*100)}%"></div></div><p class="muted">${Math.round(s.status.progress*100)} % · ${s.status.found} objekter funnet så langt</p>`:
@@ -141,6 +145,18 @@ async function loadTools(){
   </div>`;
   const b=$("#scan");if(b)b.onclick=async()=>{await post("api/scan/start");loadTools();};
   document.querySelectorAll("[data-add]").forEach(e=>e.onclick=async()=>{const[k,id]=e.dataset.add.split(":");await post("api/extra",{[k]:[+id]});loadTools();});
+  await loadAll(s.status.objects+"/"+(s.status.finished||""));
+}
+document.addEventListener("input",e=>{if(e.target.id==="objsok"&&allObj)loadAll(allCount);});
+let allObj=null,allCount=-1;
+async function loadAll(count){
+  if(count!==allCount){allCount=count;allObj=await api("api/scan/all");}
+  const q=($("#objsok").value||"").toLowerCase().trim();
+  if(!allObj.length){$("#objres").innerHTML='<p class="muted">Kjør søket over først.</p>';return;}
+  if(!q){$("#objres").innerHTML=`<p class="muted">${allObj.length} objekter. Skriv for å søke.</p>`;return;}
+  const hits=allObj.filter(o=>o.navn.toLowerCase().includes(q)||String(o.id).includes(q)).slice(0,200);
+  $("#objres").innerHTML=hits.length?hits.map(o=>`<div class="row"><span class="name">${esc(o.navn)} <small>id ${o.id} · type ${o.type}${o.kjent?" · brukes allerede":""}</small></span>${o.kjent?"":`<button class="btn" data-addobj="${o.id}">Legg til som knapp</button>`}</div>`).join(""):'<p class="muted">Ingen treff.</p>';
+  document.querySelectorAll("[data-addobj]").forEach(e=>e.onclick=async()=>{await post("api/extra",{knapper:[+e.dataset.addobj]});allCount=-1;loadTools();});
 }
 async function refresh(){
   try{

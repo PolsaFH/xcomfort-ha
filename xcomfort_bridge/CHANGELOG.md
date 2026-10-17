@@ -1,5 +1,13 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.1.1 (2026-10-17)
+
+### Nytt
+- Verktøy-fanen har et søk i ALLE objektene skanneren fant (navn eller
+  nummer), og hele lista kan lastes ned. Hvilket som helst objekt kan legges
+  til som knapp/hendelse, ikke bare de som heter `IN_...`. Nyttig for å finne
+  nye veggbrytere (f.eks. BR stue) som Home Manager har gitt et annet navn.
+
 ## 2.1.0 (2026-10-17)
 
 Ingen unique_id-er eller entity_id-er er endret. Alt nytt kommer i tillegg.

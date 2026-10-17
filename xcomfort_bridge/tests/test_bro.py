@@ -469,6 +469,17 @@ class TestNettside(unittest.TestCase):
             self.assertTrue(any(d["type"] == "markise" for d in devs))
             html = urllib.request.urlopen(base + "/", timeout=3).read()
             self.assertIn(b"xComfort", html)
+            bro.rebuild_registry()
+            bro.SCANNER.objects = {777001: ("IN_BRstuekanal1Stue", 11), 777002: ("DummyFlagg", 23),
+                                   65125: ("D_MarkiseBoblebad", 21)}
+            alle = json.loads(urllib.request.urlopen(base + "/api/scan/all", timeout=3).read())
+            self.assertEqual(len(alle), 3)
+            self.assertTrue(next(o for o in alle if o["id"] == 65125)["kjent"])
+            req = urllib.request.Request(base + "/api/extra", data=json.dumps({"knapper": [777002]}).encode(),
+                                         method="POST")
+            svar = json.loads(urllib.request.urlopen(req, timeout=3).read())
+            self.assertEqual(len(svar["lagt_til"]), 1)
+            self.assertIn(777002, bro.REG["button_ids"])
             bro.log.info("hei fra testen")
             server.shutdown()
             server.server_close()
