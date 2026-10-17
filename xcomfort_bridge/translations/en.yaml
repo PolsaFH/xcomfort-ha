@@ -1,0 +1,39 @@
+configuration:
+  xcomfort_ip:
+    name: Home Manager IP
+    description: Lokal IP-adresse til xComfort Home Manager.
+  xcomfort_port:
+    name: Home Manager port
+  mqtt_host:
+    name: MQTT-megler
+  mqtt_port:
+    name: MQTT-port
+  mqtt_username:
+    name: MQTT-brukernavn
+  mqtt_password:
+    name: MQTT-passord
+  log_level:
+    name: Loggnivå
+    description: "info = vanlig. debug = logger ALT som sendes til og fra Home Manager (bruk ved feilsøking)."
+  poll_interval:
+    name: Avlesningsintervall (sek)
+    description: Hvor ofte broen leser av alle enheter for å se endringer gjort utenfor HA.
+  markise_posisjon:
+    name: Markise-posisjon (tidsbasert)
+    description: Regner ut omtrentlig posisjon (0–100 %) ut fra kjøretid, og lar HA sette posisjon direkte.
+  markise_kjoretid_balkong:
+    name: Kjøretid balkong (sek)
+    description: Tid fra helt inne til helt ute.
+  markise_kjoretid_paviljong:
+    name: Kjøretid paviljong (sek)
+  markise_kjoretid_boblebad:
+    name: Kjøretid boblebad (sek)
+  markise_pause_mellom_kommandoer:
+    name: Pause mellom markise-kommandoer (sek)
+    description: Minste tid mellom to radiotelegrammer til markisene, så de ikke kolliderer.
+  markise_dobbel_stopp:
+    name: Send «stopp» to ganger
+    description: Sender stopp en ekstra gang etter 0,8 sek. Alltid trygt, og hjelper hvis det første telegrammet ikke kom fram.
+  markise_gjenta_bevegelse:
+    name: Gjenta «ut»/«inn» én gang (TEST FØRST)
+    description: Sender ut/inn en ekstra gang etter 1,5 sek. Slå bare på etter at testen har vist at en ekstra «ut» ikke stopper markisen.

@@ -1,0 +1,7 @@
+# Aldri last opp hemmeligheter eller anleggsdata hit
+*.json
+*.mrf
+Anlagenkonfiguration*
+__pycache__/
+*.pyc
+diagnose_logg_*
