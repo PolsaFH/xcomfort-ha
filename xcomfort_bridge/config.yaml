@@ -1,5 +1,5 @@
 name: "xComfort MQTT-bro"
-version: "2.1.1"
+version: "2.1.2"
 slug: "xcomfort_bridge"
 description: "Kobler xComfort-anlegget til Home Assistant via MQTT (lokalt, uten sky)"
 arch:

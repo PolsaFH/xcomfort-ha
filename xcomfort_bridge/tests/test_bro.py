@@ -29,8 +29,9 @@ class FakeHM:
     """Liten falsk Home Manager. Svarer med handshake, svarer paa d_obj med
     en SSN-linje, og husker alle kommandoer med tidsstempel."""
 
-    def __init__(self, handshake=True, values=None, ack_ids=(), idle_timeout=5):
+    def __init__(self, handshake=True, values=None, ack_ids=(), idle_timeout=5, exists=None):
         self.handshake = handshake
+        self.exists = set(exists) if exists is not None else None  # None = alle ID-er finnes
         self.idle_timeout = idle_timeout
         self.ack_ids = set(ack_ids)   # markiser som "kvitterer" (som ekte aktuatorer)
         self.values = values or {}
@@ -82,6 +83,8 @@ class FakeHM:
                                           f"\x01x_bm_st ACK_DIRECT seq=1\x02".encode())
                     if cmd.startswith("d_obj "):
                         oid = int(cmd.split()[1])
+                        if self.exists is not None and oid not in self.exists:
+                            continue
                         val = self.values.get(oid, 0)
                         c.sendall(f"\x01SSN {oid} OBJ_{oid} 23 1 0 {val}\x02\x00".encode())
         except OSError:
@@ -448,6 +451,26 @@ class TestSkanner(unittest.TestCase):
         self.assertEqual(c["brytere"][0]["off_id"], 32)
         self.assertEqual(c["knapper"][0]["navn"], "BRStue")
         self.assertEqual(scanner.pretty("DownlightKjellerstue"), "Downlight Kjellerstue")
+
+
+class TestSkannerFortsetter(unittest.TestCase):
+    def test_finner_objekter_forbi_max_id(self):
+        """Nye objekter fra MRF ligger over max_id -- skal likevel bli funnet."""
+        fake = FakeHM(idle_timeout=30, exists={5, 1500, 2600, 4100})
+        try:
+            bro, xc = load_bridge(fake)
+            import scanner
+            old = (scanner.WAIT_S, scanner.EMPTY_GAP)
+            scanner.WAIT_S, scanner.EMPTY_GAP = 0.02, 1500
+            try:
+                sc = scanner.Scanner(os.path.join(tempfile.mkdtemp(), "o.json"))
+                sc._run(2000)
+            finally:
+                scanner.WAIT_S, scanner.EMPTY_GAP = old
+            self.assertEqual(sorted(sc.objects), [5, 1500, 2600, 4100])
+            self.assertIsNone(sc.error)
+        finally:
+            fake.close()
 
 
 class TestNettside(unittest.TestCase):

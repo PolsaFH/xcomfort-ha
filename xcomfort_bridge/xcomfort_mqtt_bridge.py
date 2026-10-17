@@ -45,7 +45,7 @@ import scanner
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.1.1"
+BRIDGE_VERSION = "2.1.2"
 
 # ------------------------------------------------------------ innstillinger --
 

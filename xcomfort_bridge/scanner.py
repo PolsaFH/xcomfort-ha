@@ -24,6 +24,8 @@ log = logging.getLogger("xcomfort.skann")
 NAME_TYPE_RE = re.compile(r"(?:SSN|RSN) (\d+) (\S+) (\d+)")
 
 MAX_ID = 270000
+EMPTY_GAP = 30000
+HARD_LIMIT = 1000000
 BATCH = 100
 WAIT_S = 0.25
 
@@ -70,18 +72,24 @@ class Scanner:
         self.found = 0
         self.started = time.strftime("%Y-%m-%d %H:%M:%S")
         found = {}
-        log.info("Starter søk etter alle objekter i Home Manager (ID 1–%d) ...", max_id)
+        log.info("Starter søk etter alle objekter i Home Manager (ID 1–%d og videre) ...", max_id)
         conn = None
         try:
             conn = xc.XComfortConn()
-            for start in range(1, max_id + 1, BATCH):
-                ids = range(start, min(start + BATCH, max_id + 1))
+            # Nye objekter fra MRF faar de hoeyeste numrene, saa vi fortsetter
+            # forbi max_id helt til det har vaert EMPTY_GAP tomme numre paa rad.
+            start, last_hit = 1, 0
+            while start <= HARD_LIMIT and (start <= max_id or start - last_hit < EMPTY_GAP):
+                ids = range(start, start + BATCH)
                 conn.sock.sendall(b"".join(xc.STX + f"d_obj {i}".encode("ascii") + xc.ETX for i in ids))
                 text = conn.drain(wait=WAIT_S)
                 for oid, name, typ in NAME_TYPE_RE.findall(text):
                     found[int(oid)] = (name, int(typ))
+                    last_hit = max(last_hit, int(oid))
                 self.found = len(found)
-                self.progress = min(1.0, start / max_id)
+                end = max(max_id, last_hit + EMPTY_GAP)
+                self.progress = min(0.99, start / end)
+                start += BATCH
             self.objects = found
             self._save()
             log.info("Søket er ferdig: fant %d objekter", len(found))

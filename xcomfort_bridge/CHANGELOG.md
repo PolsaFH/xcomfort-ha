@@ -1,5 +1,12 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.1.2 (2026-10-17)
+
+### Rettet
+- Søket etter enheter stoppet på nummer 270 000, men Home Manager har
+  objekter helt opp mot det, og nye objekter fra MRF får høyere numre. Søket
+  fortsetter nå til det har vært 30 000 tomme numre på rad.
+
 ## 2.1.1 (2026-10-17)
 
 ### Nytt

@@ -134,7 +134,7 @@ async function loadTools(){
   const list=(arr,kind)=>arr.length?arr.map(x=>`<div class="row"><span class="name">${esc(x.navn)} <small>${esc(x.objekt)} · ${x.id}</small></span>${x.lagt_til?'<small class="state-on">lagt til</small>':`<button class="btn" data-add="${kind}:${x.id}">Legg til i HA</button>`}</div>`).join(""):'<p class="muted">Ingen.</p>';
   $("#vdyn").innerHTML=`<div class="grid" style="grid-template-columns:1fr">
    <div class="card"><h3>Søk etter nye enheter</h3>
-    <p>Går gjennom alle objektene i Home Manager og finner lys, brytere og knapper som broen ikke kjenner til ennå. Tar 10–20 minutter, men påvirker ikke radioen.</p>
+    <p>Går gjennom alle objektene i Home Manager og finner lys, brytere og knapper som broen ikke kjenner til ennå. Tar 10–20 minutter, men påvirker ikke radioen. Nye ting fra MRF havner ofte sist i lista.</p>
     ${s.status.running?`<div class="bar"><div style="width:${Math.round(s.status.progress*100)}%"></div></div><p class="muted">${Math.round(s.status.progress*100)} % · ${s.status.found} objekter funnet så langt</p>`:
      `<button class="btn pri" id="scan">Start søk</button> <span class="muted">${s.status.finished?`Sist kjørt ${esc(s.status.finished)}: ${s.status.objects} objekter`:"Ikke kjørt ennå"}${s.status.error?` · Feil: ${esc(s.status.error)}`:""}</span>`}
    </div>
