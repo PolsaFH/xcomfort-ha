@@ -1,5 +1,21 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.0.1 (2026-10-17)
+
+### Rettet
+- **Boblebad ble stående ute etter «Resett markiser».** Den ekstra
+  «stopp»-en fra en tidligere kommando kunne komme rett etter en ny «inn» og
+  stoppe markisen igjen. Det skjedde da reset ble trykket mens «Kjør ut
+  markiser» holdt på å avslutte. Nå avbryter enhver ny kommando alt som var
+  planlagt for samme markise.
+
+### Nytt
+- **Kvittering fra markisene.** Home Manager forteller oss når selve
+  markise-aktuatoren har bekreftet at den fikk telegrammet («ACK_DIRECT»).
+  Broen følger nå med på dette. Kommer det ingen kvittering innen 6 sek,
+  skrives en ADVARSEL i loggen og telles i diagnostikken
+  («uten kvittering»). Da ser vi endelig hvilke kommandoer som ikke kom fram.
+
 ## 2.0.0 (2026-10-17)
 
 Ingen unique_id-er eller entity_id-er er endret. Lys, brytere og termostater

@@ -42,7 +42,7 @@ import paho.mqtt.client as mqtt
 
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.0.0"
+BRIDGE_VERSION = "2.0.1"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -151,7 +151,13 @@ GJENTA_BEVEGELSE_PAUSE_S = 1.5
 # Hvor lenge vi venter paa svar fra Home Manager etter en markise-kommando.
 MARKISE_SVAR_VENT_S = 0.3
 # Markise-forbindelsen lukkes etter saa mange sekunder uten trafikk.
-MARKISE_CONN_IDLE_S = 3.0
+MARKISE_CONN_IDLE_S = 8.0
+# Hvor lenge vi venter paa kvittering (ACK) fra selve markise-aktuatoren.
+MARKISE_KVITTERING_S = 6.0
+# Kvittering fra aktuatoren, slik Home Manager rapporterer den, f.eks.
+# "RSN 50980 D_MarkisebalkongUte 21 1 2 2 | x_bm_st ACK_DIRECT seq=6"
+# (oppdaget 17.10.2026 i loggen til v2.0.0).
+KVITTERING_RE = re.compile(r"RSN (\d+) D_\S+ 21 \d+ (\d+) (\d+)\W*x_bm_st (\w+)")
 
 # Et lys/bryter som ikke kan finnes proeves ikke paa nytt foer dette har gaatt.
 DISCOVERY_BACKOFF_S = 1800
@@ -172,7 +178,8 @@ class Stats:
         self.failed = 0
         self.last_error = "ingen"
         self.poll_seconds = 0.0
-        self.markise = {sid: {"sendt": 0, "feilet": 0, "uten_svar": 0, "siste": "ingen"}
+        self.markise = {sid: {"sendt": 0, "feilet": 0, "kvittert": 0, "uten_kvittering": 0,
+                              "siste": "ingen"}
                         for _, _, sid in xc.MARKISER}
 
     def contact_ok(self):
@@ -205,7 +212,8 @@ class Stats:
             for sid, m in self.markise.items():
                 data[f"m{sid}_sendt"] = m["sendt"]
                 data[f"m{sid}_feilet"] = m["feilet"]
-                data[f"m{sid}_uten_svar"] = m["uten_svar"]
+                data[f"m{sid}_kvittert"] = m["kvittert"]
+                data[f"m{sid}_uten_kvittering"] = m["uten_kvittering"]
                 data[f"m{sid}_siste"] = m["siste"]
             return data
 
@@ -535,8 +543,10 @@ def publish_diag_discovery(client):
                f"{{{{ value_json.m{sid}_sendt }}}}", state_class="total_increasing")
         sensor(f"markise_{sid}_feilet", f"{short}: kommandoer feilet",
                f"{{{{ value_json.m{sid}_feilet }}}}", state_class="total_increasing")
-        sensor(f"markise_{sid}_uten_svar", f"{short}: uten svar fra Home Manager",
-               f"{{{{ value_json.m{sid}_uten_svar }}}}", state_class="total_increasing")
+        sensor(f"markise_{sid}_kvittert", f"{short}: kvitteringer fra markisen",
+               f"{{{{ value_json.m{sid}_kvittert }}}}", state_class="total_increasing")
+        sensor(f"markise_{sid}_uten_kvittering", f"{short}: uten kvittering",
+               f"{{{{ value_json.m{sid}_uten_kvittering }}}}", state_class="total_increasing")
         sensor(f"markise_{sid}_siste", f"{short}: siste kommando",
                f"{{{{ value_json.m{sid}_siste }}}}")
 
@@ -832,6 +842,8 @@ class MarkiseController:
             self.markiser[sid] = Markise(sid, name, runtime)
         self.scheduled = []        # [(tidspunkt, smux_id, handling, grunn)]
         self.last_tx = 0.0
+        self.pending_ack = {}      # smux_id -> (handling, sendetid)
+        self._ackbuf = ""
         self.conn = None
         self.conn_used = 0.0
         self.client = None
@@ -929,12 +941,48 @@ class MarkiseController:
         stats["sendt"] += 1
         STATS.add(sent=1)
         readable = xc.readable(reply)
-        if not readable:
-            stats["uten_svar"] += 1
         stats["siste"] = f"{now_str()} {action}"
-        mlog.info("%s (%s): %s -> new_state %s 0 [%s] | svar: %s",
-                  m.name, m.smux_id, action, oid, reason, readable or "(ingen)")
+        self.pending_ack[m.smux_id] = (action, t_sent)
+        self._ackbuf = ""
+        mlog.info("%s (%s): %s -> new_state %s 0 [%s]", m.name, m.smux_id, action, oid, reason)
+        mlog.debug("Svar fra Home Manager: %s", readable or "(ingen)")
+        self._scan_acks(readable)
         return t_sent
+
+    def _scan_acks(self, readable):
+        """Finner kvitteringer fra markise-aktuatorene i det Home Manager
+        sender oss. En kvittering betyr at radiotelegrammet faktisk kom
+        fram til markisen."""
+        # Meldinger kan bli delt mellom to lesinger -- vi holder paa en liten
+        # rest, men kaster alt t.o.m. siste treff, saa en gammel kvittering
+        # aldri blir regnet med for en NY kommando.
+        text = (self._ackbuf + (readable or ""))
+        matches = list(KVITTERING_RE.finditer(text))
+        self._ackbuf = text[matches[-1].end():][-400:] if matches else text[-400:]
+        for match in matches:
+            sid_s, s1, s2, kind = match.groups()
+            sid = int(sid_s)
+            m = self.markiser.get(sid)
+            if not m:
+                continue
+            pending = self.pending_ack.pop(sid, None)
+            if pending:
+                STATS.markise[sid]["kvittert"] += 1
+                mlog.info("%s: KVITTERT av markisen (%s, status %s/%s) %.1fs etter '%s'",
+                          m.name, kind, s1, s2, time.time() - pending[1], pending[0])
+            else:
+                mlog.debug("%s: kvittering %s (status %s/%s)", m.name, kind, s1, s2)
+
+    def _check_ack_timeouts(self, now):
+        for sid, (action, t_sent) in list(self.pending_ack.items()):
+            if now - t_sent > MARKISE_KVITTERING_S:
+                self.pending_ack.pop(sid, None)
+                STATS.markise[sid]["uten_kvittering"] += 1
+                mlog.warning("%s: fikk INGEN kvittering fra markisen paa '%s' innen %.0fs "
+                             "-- telegrammet kom kanskje ikke fram", self.markiser[sid].name,
+                             action, MARKISE_KVITTERING_S)
+                if self.client:
+                    publish_diag(self.client)
 
     def _close_conn(self):
         if self.conn is not None:
@@ -987,10 +1035,17 @@ class MarkiseController:
             if t_sent is not None:
                 self.scheduled.append((t_sent + secs, smux_id, "stopp", "set_position"))
             return
-        if action in ("ut", "inn"):
-            # en ny retning overstyrer en planlagt set_position-stopp
-            self.scheduled = [s for s in self.scheduled
-                              if not (s[1] == smux_id and s[3] == "set_position")]
+        # En ny kommando fra HA overstyrer ALT som var planlagt for denne
+        # markisen (ekstra stopp, gjentatt bevegelse, set_position-stopp).
+        # Uten dette kunne den ekstra "stopp"-en fra en tidligere kommando
+        # komme rett ETTER en ny "inn" og stoppe markisen igjen (skjedde
+        # 17.10 kl. 19:36 med boblebad da "Resett markiser" ble trykket
+        # mens "Kjoer ut markiser" holdt paa aa avslutte).
+        cancelled = [s for s in self.scheduled if s[1] == smux_id]
+        if cancelled:
+            self.scheduled = [s for s in self.scheduled if s[1] != smux_id]
+            mlog.info("%s: ny kommando '%s' -- avbryter planlagt %s", m.name, action,
+                      ", ".join(f"'{c[2]}' ({c[3]})" for c in cancelled))
         self._do(m, action, "fra HA")
 
     def run(self, client):
@@ -1028,6 +1083,15 @@ class MarkiseController:
         """Mens en markise gaar: publiser posisjon hvert sekund, og merk den
         som stoppet naar anslaget har naadd endestoppet."""
         now = time.time()
+        if self.conn is not None:
+            # les det Home Manager sender (kvitteringer fra markisene)
+            try:
+                chunk = self.conn._read_chunk()
+                if chunk:
+                    self._scan_acks(xc.readable(chunk.decode("latin-1", errors="replace")))
+            except Exception:  # noqa: BLE001
+                self._close_conn()
+        self._check_ack_timeouts(now)
         if self.conn is not None and now - self.conn_used > MARKISE_CONN_IDLE_S:
             self._close_conn()
         moving = [m for m in self.markiser.values() if m.moving]

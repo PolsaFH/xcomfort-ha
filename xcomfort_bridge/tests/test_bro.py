@@ -29,8 +29,9 @@ class FakeHM:
     """Liten falsk Home Manager. Svarer med handshake, svarer paa d_obj med
     en SSN-linje, og husker alle kommandoer med tidsstempel."""
 
-    def __init__(self, handshake=True, values=None):
+    def __init__(self, handshake=True, values=None, ack_ids=()):
         self.handshake = handshake
+        self.ack_ids = set(ack_ids)   # markiser som "kvitterer" (som ekte aktuatorer)
         self.values = values or {}
         self.received = []          # [(tid, kommando)]
         self.connections = 0
@@ -69,6 +70,12 @@ class FakeHM:
                     cmd = frame.replace(b"\x01", b"").decode()
                     with self.lock:
                         self.received.append((time.time(), cmd))
+                    if cmd.startswith("new_state "):
+                        oid = int(cmd.split()[1])
+                        for base in self.ack_ids:
+                            if oid - base in (61, 126, 191):
+                                c.sendall(f"\x01\x07oid x RSN {base} D_Test 21 1 2 2\x02"
+                                          f"\x01x_bm_st ACK_DIRECT seq=1\x02".encode())
                     if cmd.startswith("d_obj "):
                         oid = int(cmd.split()[1])
                         val = self.values.get(oid, 0)
@@ -259,6 +266,43 @@ class TestMarkiseKoe(unittest.TestCase):
             self.assertEqual(ids, [50980 + 191, 50980 + 126])
             self.assertAlmostEqual(m.position, 50, delta=8)
             self.assertEqual(client.last("xcomfort/cover/50980/state"), "stopped")
+        finally:
+            fake.close()
+
+
+class TestKvittering(unittest.TestCase):
+    def run_ctrl(self, bro, client, seconds):
+        threading.Thread(target=bro.MARKISER_CTRL.run, args=(client,), daemon=True).start()
+        time.sleep(seconds)
+
+    def test_ny_kommando_avbryter_ekstra_stopp(self):
+        """Gjenskaper feilen 17.10 kl 19:36: 'stopp' og rett etter 'inn' til
+        boblebad. Den ekstra stopp-en maa IKKE komme etter 'inn'."""
+        fake = FakeHM()
+        try:
+            bro, xc = load_bridge(fake, markise_pause_mellom_kommandoer=0.3, markise_dobbel_stopp=True)
+            bro.MARKISER_CTRL.markiser[65125].position = 98.0
+            bro.MARKISER_CTRL.enqueue(65125, "stopp")
+            bro.MARKISER_CTRL.enqueue(65125, "inn")
+            self.run_ctrl(bro, FakeClient(), 2.0)
+            ids = [int(c.split()[1]) for _, c in fake.commands("new_state")]
+            self.assertEqual(ids, [65125 + 126, 65125 + 61])
+            self.assertEqual(bro.MARKISER_CTRL.markiser[65125].moving, "inn")
+        finally:
+            fake.close()
+
+    def test_kvittering_telles_og_manglende_varsles(self):
+        fake = FakeHM(ack_ids=[50980])
+        try:
+            bro, xc = load_bridge(fake, markise_pause_mellom_kommandoer=0.0, markise_dobbel_stopp=False)
+            bro.MARKISE_KVITTERING_S = 1.0
+            bro.MARKISER_CTRL.enqueue(50980, "ut")
+            bro.MARKISER_CTRL.enqueue(65125, "ut")
+            self.run_ctrl(bro, FakeClient(), 2.5)
+            self.assertEqual(bro.STATS.markise[50980]["kvittert"], 1)
+            self.assertEqual(bro.STATS.markise[50980]["uten_kvittering"], 0)
+            self.assertEqual(bro.STATS.markise[65125]["kvittert"], 0)
+            self.assertEqual(bro.STATS.markise[65125]["uten_kvittering"], 1)
         finally:
             fake.close()
 
