@@ -1,5 +1,50 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.1.0 (2026-10-17)
+
+Ingen unique_id-er eller entity_id-er er endret. Alt nytt kommer i tillegg.
+
+### Nytt
+- **Hurtig status.** Broen holder nå én forbindelse åpen mot Home Manager
+  og får endringer i det øyeblikket de skjer (typisk under 1 sek), også når
+  noen bruker en bryter på veggen. Før kunne det ta opptil 20 sek. Den
+  vanlige avlesningen kjører fortsatt, men bare hvert 5. minutt så lenge
+  lytte-forbindelsen er frisk (og hvert 20. sek igjen hvis den faller ut).
+  Kan slås av med `hurtig_status`.
+- **Egen nettside i sidepanelet i HA («xComfort»).** Oversikt med
+  tilkobling, responstider og radiotrafikk, alle enheter med testknapper,
+  levende logg, rå trafikk fra Home Manager og verktøy.
+- **Knapper som hendelser.** Markiseknapp 1–3 ute (og knapper du legger til
+  selv) blir `event`-enheter i HA som kan brukes direkte i automasjoner.
+- **Søk etter nye enheter.** Verktøy-fanen kan lete gjennom hele Home
+  Manager og foreslå lys, brytere og knapper broen ikke kjenner. Huk av og
+  trykk «Legg til», så dukker de opp i HA uten ny versjon av appen.
+- **Raskere oppstart.** Appen har med seg en liste over kjente
+  styre-objekter, så den slipper å lete etter dem ved første start.
+- **Lysbrytere som lys (valgfritt).** `lysbrytere_som_lys` lager en ekstra
+  lys-enhet for hver av/på-lysbryter. Bryter-enhetene beholdes.
+- **Måling av responstid.** Når HA dimmer eller skrur på et lys, måler broen
+  hvor lang tid det tar før lampa selv melder tilbake. Vises i nettsiden og
+  som sensorer («Responstid siste/snitt», «Lys bekreftet/ubekreftet»).
+- **Radiotrafikk.** Ny sensor viser antall radiokvitteringer siste 5 min.
+- **Automatiske tester på GitHub** ved hver opplasting.
+
+### Endret
+- Fjernet sporing av kvittering per markisekommando (og sensorene
+  «uten svar», «kvittert», «uten kvittering»). Home Manager sine
+  kvitteringer gjelder hele radioen, ikke én kommando. De gamle sensorene
+  fjernes automatisk fra HA.
+- Tilstander som ikke er endret sendes ikke på nytt til MQTT hvert 20. sek.
+- Helsesjekken er flyttet inn i nettsiden (samme adresse som før).
+
+## 2.0.2 (2026-10-17)
+
+### Rettet
+- Fjernet falske advarsler «fikk INGEN kvittering». Home Manager sender ikke
+  kvittering (ACK_DIRECT) for hver markisekommando, så en manglende
+  kvittering betyr ikke at kommandoen forsvant. Logges nå bare på
+  debug-nivå mens vi kartlegger når kvitteringene faktisk kommer.
+
 ## 2.0.1 (2026-10-17)
 
 ### Rettet

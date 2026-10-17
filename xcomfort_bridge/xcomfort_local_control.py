@@ -1143,7 +1143,7 @@ def main():
             if ok and info:
                 print(f"\nFerdig -- {sys.argv[2]}: ønsket={info['setpoint']}°  målt={info['current']}°")
             elif ok:
-                print(f"\nFerdig -- sendte ny temperatur, men fikk ikke lest tilbake bekreftelse.")
+                print("\nFerdig -- sendte ny temperatur, men fikk ikke lest tilbake bekreftelse.")
             else:
                 print("\nFeilet -- se meldinger over.")
         else:

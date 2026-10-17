@@ -6,7 +6,8 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir paho-mqtt
 
-COPY xcomfort_local_control.py xcomfort_mqtt_bridge.py /app/
+COPY *.py seed_cache.json /app/
+COPY web /app/web
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 

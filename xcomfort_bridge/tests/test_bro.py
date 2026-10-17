@@ -29,12 +29,14 @@ class FakeHM:
     """Liten falsk Home Manager. Svarer med handshake, svarer paa d_obj med
     en SSN-linje, og husker alle kommandoer med tidsstempel."""
 
-    def __init__(self, handshake=True, values=None, ack_ids=()):
+    def __init__(self, handshake=True, values=None, ack_ids=(), idle_timeout=5):
         self.handshake = handshake
+        self.idle_timeout = idle_timeout
         self.ack_ids = set(ack_ids)   # markiser som "kvitterer" (som ekte aktuatorer)
         self.values = values or {}
         self.received = []          # [(tid, kommando)]
         self.connections = 0
+        self.clients = []
         self.lock = threading.Lock()
         self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -55,10 +57,12 @@ class FakeHM:
             threading.Thread(target=self._serve, args=(c,), daemon=True).start()
 
     def _serve(self, c):
+        with self.lock:
+            self.clients.append(c)
         if self.handshake:
             c.sendall(b'\x01<connect sn="1" ip="127.0.0.1" mac="x"/>\x02')
         buf = b""
-        c.settimeout(5)
+        c.settimeout(self.idle_timeout)
         try:
             while True:
                 data = c.recv(4096)
@@ -85,6 +89,16 @@ class FakeHM:
         finally:
             c.close()
 
+    def push(self, text):
+        """Sender en melding til ALLE aapne forbindelser (som ekte HM)."""
+        with self.lock:
+            clients = list(self.clients)
+        for c in clients:
+            try:
+                c.sendall(b"\x01" + text.encode() + b"\x02")
+            except OSError:
+                pass
+
     def commands(self, prefix=""):
         with self.lock:
             return [(t, c) for t, c in self.received if c.startswith(prefix)]
@@ -98,7 +112,7 @@ def load_bridge(fake, **options):
     """Laster broen paa nytt med gitte innstillinger og peker den mot den
     falske Home Manager-en."""
     tmp = tempfile.mkdtemp()
-    for mod in ("xcomfort_mqtt_bridge", "xcomfort_local_control"):
+    for mod in ("xcomfort_mqtt_bridge", "xcomfort_local_control", "hm_link", "scanner", "web"):
         sys.modules.pop(mod, None)
     import xcomfort_local_control as xc
     xc.CACHE_FILE = os.path.join(tmp, "cache.json")
@@ -107,6 +121,8 @@ def load_bridge(fake, **options):
     xc.CONTROLLER_IP = "127.0.0.1"
     xc.CONTROLLER_PORT = fake.port
     bro.POSITION_FILE = os.path.join(tmp, "pos.json")
+    bro.EXTRA_FILE = os.path.join(tmp, "ekstra.json")
+    bro.SCANNER = bro.scanner.Scanner(os.path.join(tmp, "objekter.json"))
     bro.MARKISER_CTRL = bro.MarkiseController()
     for m in bro.MARKISER_CTRL.markiser.values():
         m.position = 0.0
@@ -270,7 +286,7 @@ class TestMarkiseKoe(unittest.TestCase):
             fake.close()
 
 
-class TestKvittering(unittest.TestCase):
+class TestMarkiseRekkefoelge(unittest.TestCase):
     def run_ctrl(self, bro, client, seconds):
         threading.Thread(target=bro.MARKISER_CTRL.run, args=(client,), daemon=True).start()
         time.sleep(seconds)
@@ -288,21 +304,6 @@ class TestKvittering(unittest.TestCase):
             ids = [int(c.split()[1]) for _, c in fake.commands("new_state")]
             self.assertEqual(ids, [65125 + 126, 65125 + 61])
             self.assertEqual(bro.MARKISER_CTRL.markiser[65125].moving, "inn")
-        finally:
-            fake.close()
-
-    def test_kvittering_telles_og_manglende_varsles(self):
-        fake = FakeHM(ack_ids=[50980])
-        try:
-            bro, xc = load_bridge(fake, markise_pause_mellom_kommandoer=0.0, markise_dobbel_stopp=False)
-            bro.MARKISE_KVITTERING_S = 1.0
-            bro.MARKISER_CTRL.enqueue(50980, "ut")
-            bro.MARKISER_CTRL.enqueue(65125, "ut")
-            self.run_ctrl(bro, FakeClient(), 2.5)
-            self.assertEqual(bro.STATS.markise[50980]["kvittert"], 1)
-            self.assertEqual(bro.STATS.markise[50980]["uten_kvittering"], 0)
-            self.assertEqual(bro.STATS.markise[65125]["kvittert"], 0)
-            self.assertEqual(bro.STATS.markise[65125]["uten_kvittering"], 1)
         finally:
             fake.close()
 
@@ -333,6 +334,147 @@ class TestPosisjon(unittest.TestCase):
         d, secs = self.bro.plan_set_position(m, 0, now=0)
         self.assertEqual(d, "inn")
         self.assertAlmostEqual(secs, 4.0 + self.bro.ENDESTOPP_MARGIN_S)
+
+
+# ---------------------------------------------------------------- 2.1 --
+
+class TestLytter(unittest.TestCase):
+    def test_parse_frame(self):
+        import hm_link
+        self.assertEqual(hm_link.parse_frame("\x07oid abc RSN 65125 D_Test 21 1 2 2"),
+                         ("obj", 65125, "D_Test", ["21", "1", "2", "2"]))
+        self.assertEqual(hm_link.parse_frame("SSN 12 M_D_X_Val 23 1 0 55.5"),
+                         ("obj", 12, "M_D_X_Val", ["23", "1", "0", "55.5"]))
+        self.assertEqual(hm_link.parse_frame("x_bm_st ACK_DIRECT seq=3")[:2], ("ack", "ACK_DIRECT"))
+        self.assertEqual(hm_link.parse_frame("PANEL_BRIGHTNESS 70")[0], "annet")
+        self.assertIsNone(hm_link.parse_frame("\x00"))
+
+    def test_feed_deler_rammer_ogsaa_over_flere_pakker(self):
+        import hm_link
+        got, acks = [], []
+        link = hm_link.HMLink(lambda o, n, f: got.append((o, n, f)), lambda k: acks.append(k))
+        link.feed(b"\x01SSN 1 A 23 1 0 5\x02\x00\x01SSN 2 B")
+        self.assertEqual([g[0] for g in got], [1])
+        link.feed(b" 23 1 0 7\x02\x01x_bm_st ACK_DIRECT seq=9\x02")
+        self.assertEqual([g[0] for g in got], [1, 2])
+        self.assertEqual(acks, ["ACK_DIRECT"])
+        self.assertEqual(link.frames, 3)
+
+    def test_lytter_mot_falsk_home_manager(self):
+        """Lytte-forbindelsen kobler til, abonnerer, og gir svarene videre."""
+        fake = FakeHM(values={4242: 37})
+        try:
+            bro, xc = load_bridge(fake)
+            import hm_link
+            got = []
+            link = hm_link.HMLink(lambda o, n, f: got.append((o, f)))
+            link.subscribe([4242])
+            threading.Thread(target=link.run, daemon=True).start()
+            deadline = time.time() + 3
+            while time.time() < deadline and not got:
+                time.sleep(0.05)
+            link.stopping = True
+            self.assertTrue(link.connected or got)
+            self.assertEqual(got[0], (4242, ["23", "1", "0", "37"]))
+            self.assertTrue(link.recently_subscribed(4242))
+        finally:
+            fake.close()
+
+
+class TestRegister(unittest.TestCase):
+    def setUp(self):
+        self.fake = FakeHM()
+        self.bro, self.xc = load_bridge(self.fake)
+        self.client = FakeClient()
+        self.bro.MQTT_STATE["client"] = self.client
+        zone, name, smux = self.xc.LIGHTS[0]
+        self.smux = smux
+        self.xc.save_cache({str(smux): {"name": "D_Test", "val_id": 900001, "set_id": 900002}})
+        self.bro.rebuild_registry()
+
+    def tearDown(self):
+        self.fake.close()
+
+    def test_val_gir_lys_tilstand(self):
+        self.bro.on_hm_object(900001, "M_D_Test_Val", ["23", "1", "0", "42.4"])
+        st = json.loads(self.client.last(self.bro.light_state_topic(self.smux)))
+        self.assertEqual(st["state"], "ON")
+        self.assertEqual(st["brightness"], 42)
+        self.bro.on_hm_object(900001, "M_D_Test_Val", ["23", "1", "0", "0"])
+        st = json.loads(self.client.last(self.bro.light_state_topic(self.smux)))
+        self.assertEqual(st["state"], "OFF")
+
+    def test_responstid_maales(self):
+        self.bro.PENDING_CONFIRM[self.smux] = (60, time.time() - 1.5)
+        self.bro.on_hm_object(self.smux, "D_Test", ["21", "1", "60", "0"])
+        self.assertNotIn(self.smux, self.bro.PENDING_CONFIRM)
+        self.assertEqual(self.bro.STATS.bekreftet, 1)
+        self.assertGreater(self.bro.STATS.responstider[-1]["sek"], 1.4)
+
+    def test_knapp_gir_hendelse_men_ikke_rett_etter_abonnement(self):
+        import hm_link
+        oid = self.bro.BUTTONS[0][2]
+        self.bro.LINK = hm_link.HMLink(lambda *a: None)
+        self.bro.LINK.subscribed_at[oid] = time.time()
+        self.bro.on_hm_object(oid, "IN_Test", ["11", "1", "2"])
+        self.assertIsNone(self.client.last(self.bro.event_topic(oid)))
+        self.bro.LINK.subscribed_at[oid] = 0
+        self.bro.on_hm_object(oid, "IN_Test", ["11", "1", "2"])
+        ev = json.loads(self.client.last(self.bro.event_topic(oid)))
+        self.assertEqual(ev, {"event_type": "kode_2", "kode": 2})
+        self.bro.LINK = None
+
+    def test_unique_id_er_uendret(self):
+        """unique_id-ene til markisene maa aldri endres."""
+        self.bro.publish_discovery(self.client)
+        cfg = json.loads(self.client.last("homeassistant/cover/xcomfort_65125/config"))
+        self.assertEqual(cfg["unique_id"], "xcomfort_cover_65125")
+
+
+class TestSkanner(unittest.TestCase):
+    def test_kandidater(self):
+        import scanner
+        objs = {
+            10: ("D_Kjellerlys", 21), 11: ("M_D_Kjellerlys_Val", 23), 12: ("B_D_Kjellerlys_SET", 23),
+            20: ("D_Ukomplett", 21),
+            30: ("R_Pumpe", 8), 31: ("b_Pumpe_on", 9), 32: ("b_Pumpe_off", 9),
+            40: ("IN_BRStue", 11),
+            50: ("D_Kjent", 21), 51: ("M_D_Kjent_Val", 23), 52: ("B_D_Kjent_SET", 23),
+        }
+        c = scanner.candidates(objs, known_ids={50})
+        self.assertEqual([x["id"] for x in c["lys"]], [10])
+        self.assertEqual(c["lys"][0]["val_id"], 11)
+        self.assertEqual(c["brytere"][0]["on_id"], 31)
+        self.assertEqual(c["brytere"][0]["off_id"], 32)
+        self.assertEqual(c["knapper"][0]["navn"], "BRStue")
+        self.assertEqual(scanner.pretty("DownlightKjellerstue"), "Downlight Kjellerstue")
+
+
+class TestNettside(unittest.TestCase):
+    def test_api_svarer(self):
+        import urllib.request
+        os.environ["XCOMFORT_WEB_OPEN"] = "1"
+        fake = FakeHM()
+        try:
+            bro, xc = load_bridge(fake)
+            s = socket.socket()
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+            s.close()
+            server = bro.web.start(bro.Api(), port)
+            base = f"http://127.0.0.1:{port}"
+            st = json.loads(urllib.request.urlopen(base + "/api/status", timeout=3).read())
+            self.assertEqual(st["versjon"], bro.BRIDGE_VERSION)
+            devs = json.loads(urllib.request.urlopen(base + "/api/devices", timeout=3).read())
+            self.assertTrue(any(d["type"] == "markise" for d in devs))
+            html = urllib.request.urlopen(base + "/", timeout=3).read()
+            self.assertIn(b"xComfort", html)
+            bro.log.info("hei fra testen")
+            server.shutdown()
+            server.server_close()
+        finally:
+            fake.close()
+            os.environ.pop("XCOMFORT_WEB_OPEN", None)
 
 
 if __name__ == "__main__":

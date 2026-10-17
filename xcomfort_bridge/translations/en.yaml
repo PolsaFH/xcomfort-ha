@@ -37,3 +37,9 @@ configuration:
   markise_gjenta_bevegelse:
     name: Gjenta «ut»/«inn» én gang (TEST FØRST)
     description: Sender ut/inn en ekstra gang etter 1,5 sek. Slå bare på etter at testen har vist at en ekstra «ut» ikke stopper markisen.
+  hurtig_status:
+    name: Hurtig status (lytte-forbindelse)
+    description: Holder en forbindelse åpen mot Home Manager og får endringer med en gang (under 1 sek) i stedet for å vente på neste avlesning. Knapper blir egne hendelses-enheter. Slå av bare ved feilsøking.
+  lysbrytere_som_lys:
+    name: Lysbrytere også som lys
+    description: Lager i tillegg en lys-enhet for hver av-på-lysbryter (f.eks. taklamper), så de havner under Lys i HA og Google Home. De gamle bryter-enhetene beholdes uendret.

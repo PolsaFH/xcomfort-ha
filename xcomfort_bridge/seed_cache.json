@@ -1,0 +1,152 @@
+{
+  "41512": {
+    "name": "D_TaklampefinstueStue",
+    "val_id": 41683,
+    "set_id": 41731
+  },
+  "40023": {
+    "name": "D_TaklampeTVStue",
+    "val_id": 40194,
+    "set_id": 40242
+  },
+  "81885": {
+    "name": "D_Downlightgr1Stue",
+    "val_id": 82003,
+    "set_id": 82051
+  },
+  "53694": {
+    "name": "D_Downlightgr2Stue",
+    "val_id": 53812,
+    "set_id": 53860
+  },
+  "84517": {
+    "name": "D_LamperobordSpisestue",
+    "val_id": 84688,
+    "set_id": 84736
+  },
+  "66829": {
+    "name": "D_DownlightSpisestue",
+    "val_id": 66947,
+    "set_id": 66995
+  },
+  "110886": {
+    "name": "D_Downlightgr1Kjkken",
+    "val_id": 111004,
+    "set_id": 111052
+  },
+  "116150": {
+    "name": "D_Downlightgr2Kjkken",
+    "val_id": 116268,
+    "set_id": 116316
+  },
+  "87213": {
+    "name": "D_Downlightgr3Kjkken",
+    "val_id": 87331,
+    "set_id": 87379
+  },
+  "96607": {
+    "name": "D_LamperobenkKjkken",
+    "val_id": 96725,
+    "set_id": 96773
+  },
+  "88529": {
+    "name": "D_LamperobordKjkken",
+    "val_id": 88647,
+    "set_id": 88695
+  },
+  "71787": {
+    "name": "D_SkapKjkken",
+    "val_id": 71905,
+    "set_id": 71953
+  },
+  "104289": {
+    "name": "TS_Terassevarmer1Ute",
+    "on_id": 104360,
+    "off_id": 104457
+  },
+  "126488": {
+    "name": "TS_VifteBadkjeller",
+    "on_id": 126559,
+    "off_id": 126623
+  },
+  "124742": {
+    "name": "TS_Terassevarmer2Ute",
+    "on_id": 124813,
+    "off_id": 124910
+  },
+  "101812": {
+    "name": "R_GrdsplasslyskasterUtelys",
+    "on_id": 102021,
+    "off_id": 102097
+  },
+  "79607": {
+    "name": "R_VeggtrappHall",
+    "on_id": 79816,
+    "off_id": 79892
+  },
+  "64163": {
+    "name": "R_SpeilBadkjeller",
+    "on_id": 64372,
+    "off_id": 64448
+  },
+  "57690": {
+    "name": "R_BodnordBodnord",
+    "on_id": 57899,
+    "off_id": 57975
+  },
+  "68193": {
+    "name": "R_TaklysGarasje",
+    "on_id": 68402,
+    "off_id": 68478
+  },
+  "86251": {
+    "name": "R_LEDBadstort",
+    "on_id": 86460,
+    "off_id": 86536
+  },
+  "106282": {
+    "name": "R_LEDTrappUtelys",
+    "on_id": 106491,
+    "off_id": 106567
+  },
+  "99486": {
+    "name": "R_SpeilBadlite",
+    "on_id": 99695,
+    "off_id": 99771
+  },
+  "107292": {
+    "name": "R_BodmhemsBodmhems",
+    "on_id": 107501,
+    "off_id": 107577
+  },
+  "51416": {
+    "name": "R_Bodliten2etgBodliten",
+    "on_id": 51625,
+    "off_id": 51701
+  },
+  "73151": {
+    "name": "R_FontenehageUte",
+    "on_id": 73360,
+    "off_id": 73436
+  },
+  "128003": {
+    "name": "TS_EttervarmeVentilasjon",
+    "on_id": 128074,
+    "off_id": 128138
+  },
+  "58652": {
+    "name": "TS_Hast2Ventilasjon",
+    "on_id": 58723,
+    "off_id": 58787
+  },
+  "97923": {
+    "name": "TS_Hast3Ventilasjon",
+    "on_id": 97994,
+    "off_id": 98058
+  },
+  "38534": {
+    "name": "D_TaklampePaviljongPaviljong",
+    "val_id": 38705,
+    "set_id": 38753
+  }
+}

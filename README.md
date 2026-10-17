@@ -9,6 +9,10 @@ markiser. Ingen sky.
 2. Lim inn adressen til dette repoet og trykk Legg til.
 3. Finn «xComfort MQTT-bro» i butikken, installer, fyll inn innstillingene og start.
 
+## Nettside
+Appen har en egen side i sidepanelet i Home Assistant («xComfort») med
+status, levende logg, testknapper og søk etter nye enheter.
+
 ## Oppdatere
 Når en ny versjon er lagt ut her, dukker det opp en «Oppdater»-knapp på appen
 i Home Assistant. Se `xcomfort_bridge/CHANGELOG.md` for hva som er nytt.
@@ -17,3 +21,5 @@ i Home Assistant. Se `xcomfort_bridge/CHANGELOG.md` for hva som er nytt.
     cd xcomfort_bridge
     pip install paho-mqtt
     python -m unittest discover -s tests -v
+
+Testene kjøres også automatisk på GitHub ved hver opplasting (Actions-fanen).

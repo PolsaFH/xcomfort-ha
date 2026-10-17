@@ -26,8 +26,8 @@ Hva er nytt i v2 (se CHANGELOG.md for detaljer):
   - Alle innstillinger hentes fra appens options (/data/options.json).
 """
 
+import collections
 import datetime as _dt
-import http.server
 import json
 import logging
 import os
@@ -40,9 +40,12 @@ import time
 
 import paho.mqtt.client as mqtt
 
+import hm_link
+import scanner
+import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.0.1"
+BRIDGE_VERSION = "2.1.0"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -62,6 +65,8 @@ DEFAULT_OPTIONS = {
     "markise_pause_mellom_kommandoer": 0.5,
     "markise_dobbel_stopp": True,
     "markise_gjenta_bevegelse": False,
+    "hurtig_status": True,
+    "lysbrytere_som_lys": False,
 }
 
 OPTIONS_FILE = "/data/options.json"
@@ -109,8 +114,10 @@ def setup_logging(level_name):
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter(
         "%(asctime)s.%(msecs)03d %(levelname)-7s %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S"))
+    web.LOG_RING.setFormatter(logging.Formatter(
+        "%(asctime)s.%(msecs)03d %(levelname)-7s %(name)s: %(message)s", "%H:%M:%S"))
     root = logging.getLogger()
-    root.handlers[:] = [handler]
+    root.handlers[:] = [handler, web.LOG_RING]
     root.setLevel(level)
     logging.getLogger("paho").setLevel(logging.WARNING)
 
@@ -152,12 +159,11 @@ GJENTA_BEVEGELSE_PAUSE_S = 1.5
 MARKISE_SVAR_VENT_S = 0.3
 # Markise-forbindelsen lukkes etter saa mange sekunder uten trafikk.
 MARKISE_CONN_IDLE_S = 8.0
-# Hvor lenge vi venter paa kvittering (ACK) fra selve markise-aktuatoren.
-MARKISE_KVITTERING_S = 6.0
-# Kvittering fra aktuatoren, slik Home Manager rapporterer den, f.eks.
-# "RSN 50980 D_MarkisebalkongUte 21 1 2 2 | x_bm_st ACK_DIRECT seq=6"
-# (oppdaget 17.10.2026 i loggen til v2.0.0).
-KVITTERING_RE = re.compile(r"RSN (\d+) D_\S+ 21 \d+ (\d+) (\d+)\W*x_bm_st (\w+)")
+# Hvor lenge vi venter paa at en lampe bekrefter ny lysstyrke.
+LYS_BEKREFT_S = 15.0
+# Naar lytte-forbindelsen virker, leses alt likevel av saa ofte (sekunder),
+# som en ekstra sikkerhet. Uten lytte-forbindelse brukes poll_interval.
+FULL_AVLESNING_S = 300
 
 # Et lys/bryter som ikke kan finnes proeves ikke paa nytt foer dette har gaatt.
 DISCOVERY_BACKOFF_S = 1800
@@ -178,9 +184,12 @@ class Stats:
         self.failed = 0
         self.last_error = "ingen"
         self.poll_seconds = 0.0
-        self.markise = {sid: {"sendt": 0, "feilet": 0, "kvittert": 0, "uten_kvittering": 0,
-                              "siste": "ingen"}
-                        for _, _, sid in xc.MARKISER}
+        self.markise = {sid: {"sendt": 0, "feilet": 0, "siste": "ingen"} for _, _, sid in xc.MARKISER}
+        self.bekreftet = 0
+        self.ubekreftet = 0
+        self.responstider = collections.deque(maxlen=50)   # dict(navn, sek, tid)
+        self.radio = collections.deque(maxlen=2000)          # tidspunkt for radiokvitteringer
+        self.poll_modus = "vanlig"
 
     def contact_ok(self):
         with self.lock:
@@ -208,17 +217,32 @@ class Stats:
                 "poll_seconds": round(self.poll_seconds, 2),
                 "markise_queue": queue_len,
                 "version": BRIDGE_VERSION,
+                "listener_ok": "ON" if (LINK and LINK.healthy()) else "OFF",
+                "confirmed": self.bekreftet,
+                "unconfirmed": self.ubekreftet,
+                "resp_last": round(self.responstider[-1]["sek"], 2) if self.responstider else None,
+                "resp_avg": self.avg_response(),
+                "radio_5min": self.radio_recent(),
             }
             for sid, m in self.markise.items():
                 data[f"m{sid}_sendt"] = m["sendt"]
                 data[f"m{sid}_feilet"] = m["feilet"]
-                data[f"m{sid}_kvittert"] = m["kvittert"]
-                data[f"m{sid}_uten_kvittering"] = m["uten_kvittering"]
                 data[f"m{sid}_siste"] = m["siste"]
             return data
 
 
+    def avg_response(self):
+        if not self.responstider:
+            return None
+        return round(sum(r["sek"] for r in self.responstider) / len(self.responstider), 2)
+
+    def radio_recent(self, seconds=300):
+        cutoff = time.time() - seconds
+        return sum(1 for t in self.radio if t > cutoff)
+
+
 STATS = Stats()
+LINK = None  # settes i main() -- hm_link.HMLink
 
 # Siste publiserte retained-tilstand per emne -- sendes paa nytt naar Home
 # Assistant restarter (homeassistant/status = online).
@@ -234,10 +258,19 @@ def now_str():
     return _dt.datetime.now().strftime("%H:%M:%S.%f")[:-3]
 
 
-def publish_state(client, topic, payload, retain=True, qos=0):
+_state_sent_at = {}
+
+
+def publish_state(client, topic, payload, retain=True, qos=0, force=False):
+    """Publiserer tilstand. Samme verdi som sist sendes ikke paa nytt
+    oftere enn hvert 5. minutt (Home Manager sender mye om igjen)."""
     if retain:
         with _state_cache_lock:
+            same = _state_cache.get(topic) == payload
+            if same and not force and time.time() - _state_sent_at.get(topic, 0) < 300:
+                return
             _state_cache[topic] = payload
+            _state_sent_at[topic] = time.time()
     client.publish(topic, payload, qos=qos, retain=retain)
 
 
@@ -543,12 +576,27 @@ def publish_diag_discovery(client):
                f"{{{{ value_json.m{sid}_sendt }}}}", state_class="total_increasing")
         sensor(f"markise_{sid}_feilet", f"{short}: kommandoer feilet",
                f"{{{{ value_json.m{sid}_feilet }}}}", state_class="total_increasing")
-        sensor(f"markise_{sid}_kvittert", f"{short}: kvitteringer fra markisen",
-               f"{{{{ value_json.m{sid}_kvittert }}}}", state_class="total_increasing")
-        sensor(f"markise_{sid}_uten_kvittering", f"{short}: uten kvittering",
-               f"{{{{ value_json.m{sid}_uten_kvittering }}}}", state_class="total_increasing")
         sensor(f"markise_{sid}_siste", f"{short}: siste kommando",
                f"{{{{ value_json.m{sid}_siste }}}}")
+        # Fjern sensorer fra 2.0.x som ikke finnes lenger (tom config = slett)
+        for old in ("uten_svar", "kvittert", "uten_kvittering"):
+            client.publish(f"{DISCOVERY_PREFIX}/sensor/xcomfort_diag_markise_{sid}_{old}/config",
+                           "", qos=1, retain=True)
+
+    _pub_disc(client, "binary_sensor", "xcomfort_diag_lytter", dict(
+        base, name="Øyeblikkelig status (lytte-forbindelse)", unique_id="xcomfort_diag_lytter",
+        value_template="{{ value_json.listener_ok }}", payload_on="ON", payload_off="OFF",
+        device_class="connectivity"))
+    sensor("responstid_siste", "Responstid lys (siste)", "{{ value_json.resp_last }}",
+           unit_of_measurement="s", state_class="measurement")
+    sensor("responstid_snitt", "Responstid lys (snitt siste 50)", "{{ value_json.resp_avg }}",
+           unit_of_measurement="s", state_class="measurement")
+    sensor("lys_bekreftet", "Lyskommandoer bekreftet av lampa", "{{ value_json.confirmed }}",
+           state_class="total_increasing")
+    sensor("lys_ubekreftet", "Lyskommandoer uten bekreftelse", "{{ value_json.unconfirmed }}",
+           state_class="total_increasing")
+    sensor("radio_5min", "Radiokvitteringer siste 5 min", "{{ value_json.radio_5min }}",
+           state_class="measurement")
 
 
 def publish_discovery(client):
@@ -563,6 +611,8 @@ def publish_discovery(client):
     publish_climate_discovery(client)
     publish_button_discovery(client)
     publish_diag_discovery(client)
+    publish_event_discovery(client)
+    publish_onoff_light_discovery(client)
 
 
 def publish_diag(client):
@@ -620,11 +670,16 @@ def _parse_light_brightness(payload_bytes):
     return max(0, min(100, int(brightness)))
 
 
-def publish_light_state(client, smux_id, brightness):
+def publish_light_state(client, smux_id, brightness, force=False):
     payload = {"state": "ON" if brightness > 0 else "OFF"}
     if brightness > 0:
         payload["brightness"] = brightness
-    publish_state(client, light_state_topic(smux_id), json.dumps(payload))
+    publish_state(client, light_state_topic(smux_id), json.dumps(payload), force=force)
+
+
+# Lys vi har sendt kommando til, og venter paa at lampa selv bekrefter
+# (via D_-objektet paa lytte-forbindelsen): smux_id -> (maal %, sendetid)
+PENDING_CONFIRM = {}
 
 
 _discovery_retry_after = {}
@@ -722,10 +777,12 @@ def _process_command_batch(client, batch):
         log.info("Kommando-bolk (%d sendt, %.2fs): %s", n, time.time() - t_start, names)
         log.debug("Svar paa bolk: %s", xc.readable(reply) or "(ingen)")
 
+    now = time.time()
     for smux_id, brightness, _ in armed_lights:
-        publish_light_state(client, smux_id, brightness)
+        publish_light_state(client, smux_id, brightness, force=True)
+        PENDING_CONFIRM[smux_id] = (brightness, now)
     for smux_id, on, _ in armed_switches:
-        publish_state(client, switch_state_topic(smux_id), "ON" if on else "OFF")
+        publish_switch_state(client, smux_id, on, force=True)
     for smux_id, target in applied_climate:
         publish_state(client, climate_temp_state_topic(smux_id), f"{target:.1f}")
 
@@ -842,8 +899,6 @@ class MarkiseController:
             self.markiser[sid] = Markise(sid, name, runtime)
         self.scheduled = []        # [(tidspunkt, smux_id, handling, grunn)]
         self.last_tx = 0.0
-        self.pending_ack = {}      # smux_id -> (handling, sendetid)
-        self._ackbuf = ""
         self.conn = None
         self.conn_used = 0.0
         self.client = None
@@ -942,47 +997,9 @@ class MarkiseController:
         STATS.add(sent=1)
         readable = xc.readable(reply)
         stats["siste"] = f"{now_str()} {action}"
-        self.pending_ack[m.smux_id] = (action, t_sent)
-        self._ackbuf = ""
         mlog.info("%s (%s): %s -> new_state %s 0 [%s]", m.name, m.smux_id, action, oid, reason)
-        mlog.debug("Svar fra Home Manager: %s", readable or "(ingen)")
-        self._scan_acks(readable)
+        mlog.debug("%s: svar fra Home Manager: %s", m.name, readable or "(ingen)")
         return t_sent
-
-    def _scan_acks(self, readable):
-        """Finner kvitteringer fra markise-aktuatorene i det Home Manager
-        sender oss. En kvittering betyr at radiotelegrammet faktisk kom
-        fram til markisen."""
-        # Meldinger kan bli delt mellom to lesinger -- vi holder paa en liten
-        # rest, men kaster alt t.o.m. siste treff, saa en gammel kvittering
-        # aldri blir regnet med for en NY kommando.
-        text = (self._ackbuf + (readable or ""))
-        matches = list(KVITTERING_RE.finditer(text))
-        self._ackbuf = text[matches[-1].end():][-400:] if matches else text[-400:]
-        for match in matches:
-            sid_s, s1, s2, kind = match.groups()
-            sid = int(sid_s)
-            m = self.markiser.get(sid)
-            if not m:
-                continue
-            pending = self.pending_ack.pop(sid, None)
-            if pending:
-                STATS.markise[sid]["kvittert"] += 1
-                mlog.info("%s: KVITTERT av markisen (%s, status %s/%s) %.1fs etter '%s'",
-                          m.name, kind, s1, s2, time.time() - pending[1], pending[0])
-            else:
-                mlog.debug("%s: kvittering %s (status %s/%s)", m.name, kind, s1, s2)
-
-    def _check_ack_timeouts(self, now):
-        for sid, (action, t_sent) in list(self.pending_ack.items()):
-            if now - t_sent > MARKISE_KVITTERING_S:
-                self.pending_ack.pop(sid, None)
-                STATS.markise[sid]["uten_kvittering"] += 1
-                mlog.warning("%s: fikk INGEN kvittering fra markisen paa '%s' innen %.0fs "
-                             "-- telegrammet kom kanskje ikke fram", self.markiser[sid].name,
-                             action, MARKISE_KVITTERING_S)
-                if self.client:
-                    publish_diag(self.client)
 
     def _close_conn(self):
         if self.conn is not None:
@@ -1084,14 +1101,13 @@ class MarkiseController:
         som stoppet naar anslaget har naadd endestoppet."""
         now = time.time()
         if self.conn is not None:
-            # les det Home Manager sender (kvitteringer fra markisene)
+            # Home Manager sender alt til alle forbindelser -- les og kast
+            # det, saa bufferet ikke fylles opp (lytte-forbindelsen tar seg
+            # av det som er interessant).
             try:
-                chunk = self.conn._read_chunk()
-                if chunk:
-                    self._scan_acks(xc.readable(chunk.decode("latin-1", errors="replace")))
+                self.conn._read_chunk()
             except Exception:  # noqa: BLE001
                 self._close_conn()
-        self._check_ack_timeouts(now)
         if self.conn is not None and now - self.conn_used > MARKISE_CONN_IDLE_S:
             self._close_conn()
         moving = [m for m in self.markiser.values() if m.moving]
@@ -1137,6 +1153,15 @@ SWITCH_SET_RE = re.compile(r"^xcomfort/switch/(\d+)/set$")
 COVER_SET_RE = re.compile(r"^xcomfort/cover/(\d+)/set$")
 COVER_POS_RE = re.compile(r"^xcomfort/cover/(\d+)/set_position$")
 CLIMATE_SET_RE = re.compile(r"^xcomfort/climate/(\d+)/temp_set$")
+ONOFF_SET_RE = re.compile(r"^xcomfort/onofflight/(\d+)/set$")
+
+
+def _onoff_light_command(client, smux_id, payload):
+    try:
+        on = json.loads(payload.decode("utf-8")).get("state", "ON") == "ON"
+    except Exception:  # noqa: BLE001
+        on = payload.decode("utf-8", errors="replace").strip().upper() == "ON"
+    _queue_command("switch", smux_id, b"ON" if on else b"OFF")
 
 
 def _republish_after_ha_restart(client):
@@ -1159,7 +1184,8 @@ def on_connect(client, userdata, flags, reason_code, properties):
     client.publish(AVAILABILITY_TOPIC, "online", qos=1, retain=True)
     publish_discovery(client)
     for topic in ("xcomfort/light/+/set", "xcomfort/switch/+/set", "xcomfort/cover/+/set",
-                  "xcomfort/cover/+/set_position", "xcomfort/climate/+/temp_set"):
+                  "xcomfort/cover/+/set_position", "xcomfort/climate/+/temp_set",
+                  "xcomfort/onofflight/+/set"):
         client.subscribe(topic, qos=1)
     client.subscribe(HA_STATUS_TOPIC, qos=1)
     MARKISER_CTRL.publish_all()
@@ -1183,7 +1209,8 @@ def on_message(client, userdata, message):
                                (SWITCH_SET_RE, lambda c, i, p: _queue_command("switch", i, p)),
                                (COVER_SET_RE, handle_cover_command),
                                (COVER_POS_RE, handle_cover_position),
-                               (CLIMATE_SET_RE, lambda c, i, p: _queue_command("climate", i, p))):
+                               (CLIMATE_SET_RE, lambda c, i, p: _queue_command("climate", i, p)),
+                               (ONOFF_SET_RE, _onoff_light_command)):
             m = regex.match(topic)
             if m:
                 handler(client, int(m.group(1)), message.payload)
@@ -1245,7 +1272,7 @@ def poll_switches(client, conn):
     found = {int(o): float(v) for o, v in SWITCH_STATE_RE.findall(_batch_d_obj(conn, ids, wait=0.8))}
     for smux_id in ids:
         if smux_id in found:
-            publish_state(client, switch_state_topic(smux_id), "ON" if found[smux_id] > 0 else "OFF")
+            publish_switch_state(client, smux_id, found[smux_id] > 0)
 
 
 def poll_binary_sensors(client, conn):
@@ -1304,9 +1331,19 @@ def poll_all(client):
 
 
 def poll_loop(client):
+    """Leser alt av jevnlig. Med frisk lytte-forbindelse holder det med en
+    full avlesning hvert 5. minutt; ellers brukes poll_interval."""
+    last = 0.0
     while True:
         HEARTBEAT["poll"] = time.time()
-        time.sleep(OPTS["poll_interval"])
+        time.sleep(1.0)
+        fast = LINK is not None and LINK.healthy()
+        interval = FULL_AVLESNING_S if fast else OPTS["poll_interval"]
+        STATS.poll_modus = "øyeblikkelig (+ full avlesning hvert 5. min)" if fast else \
+            f"hvert {OPTS['poll_interval']}. sekund"
+        if time.time() - last < interval:
+            continue
+        last = time.time()
         HEARTBEAT["poll"] = time.time()
         try:
             poll_all(client)
@@ -1315,42 +1352,385 @@ def poll_loop(client):
         publish_diag(client)
 
 
-# ----------------------------------------------------------- helsesjekk --
+# ------------------------------------------------- lytte-forbindelse (2.1) --
+#
+# Én vedvarende forbindelse som bare lytter. Home Manager sender endringer
+# av seg selv (bekreftet 17.10.2026), saa HA faar ny tilstand innen et
+# sekund i stedet for etter neste pollrunde. Pollingen gaar fortsatt, men
+# sjeldnere (FULL_AVLESNING_S) saa lenge lytte-forbindelsen er frisk.
 
-def healthy():
-    now = time.time()
-    problems = []
-    if not MQTT_STATE["connected"]:
-        problems.append("ikke koblet til MQTT")
-    if now - HEARTBEAT["poll"] > OPTS["poll_interval"] * 3 + 120:
-        problems.append("polling henger")
-    if now - HEARTBEAT["batch"] > 60:
-        problems.append("kommando-traaden henger")
-    if now - HEARTBEAT["markise"] > 60:
-        problems.append("markise-traaden henger")
-    return problems
+REG = {
+    "val_to_light": {},   # Val-id -> lys-smux
+    "light_ids": set(),   # D_-objekter for lys (bekreftelse/responstid)
+    "switch_ids": set(),
+    "binary_ids": set(),
+    "sensor_ids": set(),
+    "thermo_ids": set(),
+    "button_ids": {},     # IN_-id -> navn
+    "markise_ids": set(),
+    "names": {},          # smux -> "Sone Navn" (for logg/nettside)
+}
+
+# Knapper/innganger som blir hendelser (event) i HA. Markiseknappene er
+# kjent fra sky-oppslaget 17.10.2026; flere kan legges til fra nettsiden.
+BUTTONS = [
+    ("Ute", "Markiseknapp 1", 232304),
+    ("Ute", "Markiseknapp 2", 234213),
+    ("Ute", "Markiseknapp 3", 233840),
+]
+EVENT_TYPES = [f"kode_{i}" for i in range(10)]
+
+# Av/paa-brytere som egentlig er lys. Med innstillingen "lysbrytere_som_lys"
+# faar disse i tillegg en ekte lys-entitet i HA (bryteren beholdes).
+LIGHT_SWITCH_IDS = {106282, 117514, 79607, 68193, 86251, 99486, 64163, 107292, 57690, 51416, 101812}
+
+EXTRA_FILE = "/data/ekstra_enheter.json" if os.path.isdir("/data") else \
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "ekstra_enheter.json")
+SCAN_FILE = "/data/objekter.json" if os.path.isdir("/data") else \
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "objekter.json")
+SEED_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seed_cache.json")
+
+SCANNER = scanner.Scanner(SCAN_FILE)
 
 
-class _HealthHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):  # noqa: N802
-        problems = healthy()
-        body = json.dumps({"ok": not problems, "problemer": problems, "versjon": BRIDGE_VERSION}).encode()
-        self.send_response(200 if not problems else 503)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(body)
-
-    def log_message(self, *args):  # ikke spam loggen
-        pass
+def event_topic(i):
+    return f"xcomfort/event/{i}"
 
 
-def start_health_server():
+def onoff_state_topic(i):
+    return f"xcomfort/onofflight/{i}/state"
+
+
+def onoff_command_topic(i):
+    return f"xcomfort/onofflight/{i}/set"
+
+
+def publish_switch_state(client, smux_id, on, force=False):
+    publish_state(client, switch_state_topic(smux_id), "ON" if on else "OFF", force=force)
+    if OPTS["lysbrytere_som_lys"] and smux_id in LIGHT_SWITCH_IDS:
+        publish_state(client, onoff_state_topic(smux_id), json.dumps({"state": "ON" if on else "OFF"}), force=force)
+
+
+def publish_event_discovery(client):
+    for zone, name, oid in BUTTONS:
+        _pub_disc(client, "event", f"xcomfort_in_{oid}", {
+            "name": name,
+            "unique_id": f"xcomfort_event_{oid}",
+            "state_topic": event_topic(oid),
+            "event_types": EVENT_TYPES,
+            "device_class": "button",
+            "device": device_block(zone),
+        })
+
+
+def publish_onoff_light_discovery(client):
+    for zone, name, smux_id in xc.SWITCHES:
+        if smux_id not in LIGHT_SWITCH_IDS:
+            continue
+        topic = f"{DISCOVERY_PREFIX}/light/xcomfort_onoff_{smux_id}/config"
+        if not OPTS["lysbrytere_som_lys"]:
+            client.publish(topic, "", qos=1, retain=True)
+            continue
+        _pub_disc(client, "light", f"xcomfort_onoff_{smux_id}", {
+            "name": f"{name} (lys)",
+            "unique_id": f"xcomfort_onofflight_{smux_id}",
+            "state_topic": onoff_state_topic(smux_id),
+            "command_topic": onoff_command_topic(smux_id),
+            "schema": "json",
+            "supported_color_modes": ["onoff"],
+            "optimistic": False,
+            "qos": 1,
+            "device": device_block(zone),
+        })
+
+
+def load_extras():
+    """Enheter som er lagt til fra nettsiden (Verktoey -> Soek etter nye
+    enheter). Legges til listene foer discovery, med samme unique_id-moenster
+    som de faste enhetene."""
     try:
-        server = http.server.ThreadingHTTPServer(("0.0.0.0", HEALTH_PORT), _HealthHandler)
-    except OSError as e:
-        log.warning("Klarte ikke starte helsesjekk paa port %d: %s", HEALTH_PORT, e)
+        with open(EXTRA_FILE, encoding="utf-8") as f:
+            extra = json.load(f)
+    except FileNotFoundError:
         return
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    except Exception as e:  # noqa: BLE001
+        log.warning("Klarte ikke lese %s: %s", EXTRA_FILE, e)
+        return
+    cache = xc.load_cache()
+    known = {s for _, _, s in xc.LIGHTS} | {s for _, _, s in xc.SWITCHES} | {b[2] for b in BUTTONS}
+    changed = False
+    for item in extra.get("lys", []):
+        if item["id"] in known:
+            continue
+        xc.LIGHTS.append((item.get("sone", "Nye enheter"), item["navn"], item["id"]))
+        if item.get("val_id") and item.get("set_id") and str(item["id"]) not in cache:
+            cache[str(item["id"])] = {"name": item.get("objekt"), "val_id": item["val_id"], "set_id": item["set_id"]}
+            changed = True
+    for item in extra.get("brytere", []):
+        if item["id"] in known:
+            continue
+        xc.SWITCHES.append((item.get("sone", "Nye enheter"), item["navn"], item["id"]))
+        if item.get("on_id") and item.get("off_id") and str(item["id"]) not in cache:
+            cache[str(item["id"])] = {"name": item.get("objekt"), "on_id": item["on_id"], "off_id": item["off_id"]}
+            changed = True
+    for item in extra.get("knapper", []):
+        if item["id"] in known:
+            continue
+        BUTTONS.append((item.get("sone", "Knapper"), item["navn"], item["id"]))
+    if changed:
+        xc.save_cache(cache)
+    log.info("Ekstra enheter fra nettsiden: %d lys, %d brytere, %d knapper",
+             len(extra.get("lys", [])), len(extra.get("brytere", [])), len(extra.get("knapper", [])))
+
+
+def merge_seed_cache():
+    """Fyller inn styre-objekter som mangler i /data-cachen fra fila som
+    foelger med appen, saa en ny installasjon ikke maa lete etter alt."""
+    try:
+        with open(SEED_CACHE_FILE, encoding="utf-8") as f:
+            seed = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    cache = xc.load_cache()
+    added = {k: v for k, v in seed.items() if k not in cache}
+    if added:
+        cache.update(added)
+        xc.save_cache(cache)
+        log.info("La inn %d kjente styre-objekter fra appens startliste", len(added))
+
+
+def rebuild_registry():
+    cache = xc.load_cache()
+    REG["val_to_light"] = {}
+    for zone, name, smux in xc.LIGHTS:
+        REG["names"][smux] = f"{zone} {name}"
+        info = cache.get(str(smux)) or {}
+        if info.get("val_id"):
+            REG["val_to_light"][info["val_id"]] = smux
+    REG["light_ids"] = {s for _, _, s in xc.LIGHTS}
+    REG["switch_ids"] = {s for _, _, s in xc.SWITCHES}
+    REG["binary_ids"] = {s for _, _, s, _ in BINARY_SENSORS}
+    REG["sensor_ids"] = {s for _, _, s, _ in CONTINUOUS_SENSORS}
+    REG["thermo_ids"] = {s for _, _, s in xc.THERMOSTATS}
+    REG["button_ids"] = {oid: f"{zone} {name}" for zone, name, oid in BUTTONS}
+    REG["markise_ids"] = {s for _, _, s in xc.MARKISER}
+    for zone, name, smux in xc.SWITCHES + xc.MARKISER:
+        REG["names"][smux] = f"{zone} {name}"
+    ids = (set(REG["val_to_light"]) | REG["light_ids"] | REG["switch_ids"] | REG["binary_ids"]
+           | REG["sensor_ids"] | REG["thermo_ids"] | set(REG["button_ids"]) | REG["markise_ids"])
+    return ids
+
+
+def _num(fields, idx):
+    try:
+        return float(fields[idx])
+    except (IndexError, ValueError):
+        return None
+
+
+def on_hm_object(oid, name, fields):
+    """Kalles for hver SSN/RSN-melding paa lytte-forbindelsen."""
+    client = MQTT_STATE["client"]
+    web.RAW_RING.add(f"{web.ts()}  {oid:>7} {name:<32} {' '.join(fields)}")
+    if client is None:
+        return
+    STATS.contact_ok()
+    if oid in REG["val_to_light"]:
+        v = _num(fields, 3)
+        if v is not None:
+            publish_light_state(client, REG["val_to_light"][oid], max(0, min(100, round(v))))
+    if oid in REG["light_ids"]:
+        level = _num(fields, 2)
+        pending = PENDING_CONFIRM.get(oid)
+        if pending and level is not None and abs(level - pending[0]) <= 2:
+            PENDING_CONFIRM.pop(oid, None)
+            secs = time.time() - pending[1]
+            with STATS.lock:
+                STATS.bekreftet += 1
+                STATS.responstider.append({"navn": REG["names"].get(oid, str(oid)), "sek": secs,
+                                           "tid": time.strftime("%H:%M:%S")})
+            log.info("Lys %s bekreftet %d %% etter %.1fs", REG["names"].get(oid, oid), level, secs)
+    if oid in REG["switch_ids"]:
+        v = _num(fields, 2)
+        if v is not None:
+            publish_switch_state(client, oid, v > 0)
+    if oid in REG["binary_ids"]:
+        v = _num(fields, 2)
+        if v is not None:
+            publish_state(client, binary_sensor_state_topic(oid), "ON" if v > 0 else "OFF")
+    if oid in REG["sensor_ids"]:
+        v = _num(fields, 3)
+        if v is not None:
+            publish_state(client, sensor_state_topic(oid), str(v))
+    if oid in REG["thermo_ids"] and len(fields) >= 6:
+        publish_state(client, climate_temp_state_topic(oid), fields[3])
+        publish_state(client, climate_current_topic(oid), fields[4])
+        publish_state(client, climate_valve_topic(oid), fields[5])
+    # Et svar paa et d_obj-spoersmaal (fra skanneren eller en annen klient)
+    # ser ut som en hendelse -- ignorer knapper mens skanneren gaar.
+    quiet = LINK is None or LINK.recently_subscribed(oid) or SCANNER.running
+    if oid in REG["button_ids"]:
+        code = _num(fields, 2)
+        if code is not None and not quiet:
+            kode = int(code)
+            log.info("Knapp %s: kode %d", REG["button_ids"][oid], kode)
+            client.publish(event_topic(oid), json.dumps({"event_type": f"kode_{min(kode, 9)}", "kode": kode}),
+                           qos=0, retain=False)
+    elif name.startswith("IN_") and oid not in REG["binary_ids"] and not quiet:
+        log.info("Ukjent knapp/inngang %s (%d) sendte %s -- kan legges til under Verktøy i appen",
+                 name, oid, " ".join(fields))
+    if oid in REG["markise_ids"]:
+        mlog.debug("Markise-objekt %s: %s", REG["names"].get(oid, oid), " ".join(fields))
+
+
+def on_hm_ack(kind):
+    STATS.radio.append(time.time())
+    web.RAW_RING.add(f"{web.ts()}  radiokvittering {kind}")
+
+
+def on_hm_other(text):
+    web.RAW_RING.add(f"{web.ts()}  {text}")
+
+
+def housekeeping(client):
+    """Hvert sekund: lys som ikke ble bekreftet i tide, og jevnlig diagnostikk."""
+    last_diag = 0.0
+    while True:
+        time.sleep(1.0)
+        now = time.time()
+        for smux, (target, t0) in list(PENDING_CONFIRM.items()):
+            if now - t0 > LYS_BEKREFT_S:
+                PENDING_CONFIRM.pop(smux, None)
+                with STATS.lock:
+                    STATS.ubekreftet += 1
+                log.info("Lys %s: lampa bekreftet ikke %d %% innen %.0fs (enten treg radio, "
+                         "eller en lampe som ikke rapporterer status)", REG["names"].get(smux, smux),
+                         target, LYS_BEKREFT_S)
+        if now - last_diag > 30:
+            last_diag = now
+            publish_diag(client)
+
+
+# ----------------------------------------------------- nettside / API (2.1) --
+
+class Api:
+    """Det nettsiden kan spoerre om og be broen gjoere."""
+
+    def health(self):
+        now = time.time()
+        problems = []
+        if not MQTT_STATE["connected"]:
+            problems.append("ikke koblet til MQTT")
+        if now - HEARTBEAT["poll"] > max(OPTS["poll_interval"], FULL_AVLESNING_S) * 2 + 120:
+            problems.append("polling henger")
+        if now - HEARTBEAT["batch"] > 60:
+            problems.append("kommando-traaden henger")
+        if now - HEARTBEAT["markise"] > 60:
+            problems.append("markise-traaden henger")
+        return problems
+
+    def status(self):
+        snap = STATS.snapshot(MARKISER_CTRL.queue_length())
+        return {
+            "versjon": BRIDGE_VERSION,
+            "mqtt": MQTT_STATE["connected"],
+            "mqtt_host": OPTS["mqtt_host"],
+            "lytter_ok": bool(LINK and LINK.healthy()),
+            "siste_melding_sek": round(time.time() - LINK.last_rx) if LINK and LINK.last_rx else None,
+            "sendt": snap["sent"], "feilet": snap["failed"], "siste_feil": snap["last_error"],
+            "bekreftet": snap["confirmed"], "ubekreftet": snap["unconfirmed"],
+            "snitt_respons": snap["resp_avg"], "radio_5min": snap["radio_5min"],
+            "poll_modus": STATS.poll_modus, "poll_sek": round(STATS.poll_seconds, 1),
+            "responstider": list(STATS.responstider),
+            "markiser": [{"navn": m.name, "posisjon": round(m.current_position()), "tilstand": m.ha_state()}
+                         for m in MARKISER_CTRL.markiser.values()],
+        }
+
+    def devices(self):
+        with _state_cache_lock:
+            cache = dict(_state_cache)
+        out = []
+        for zone, name, smux in xc.LIGHTS:
+            st = json.loads(cache.get(light_state_topic(smux), "{}") or "{}")
+            on = st.get("state") == "ON"
+            out.append({"type": "lys", "id": smux, "sone": zone, "navn": name, "på": on,
+                        "tilstand": f"{st.get('brightness', 100)} %" if on else ("av" if st else "?")})
+        for zone, name, smux in xc.SWITCHES:
+            v = cache.get(switch_state_topic(smux))
+            out.append({"type": "bryter", "id": smux, "sone": zone, "navn": name, "på": v == "ON",
+                        "tilstand": {"ON": "på", "OFF": "av"}.get(v, "?")})
+        for zone, name, smux in xc.MARKISER:
+            m = MARKISER_CTRL.markiser[smux]
+            out.append({"type": "markise", "id": smux, "sone": zone, "navn": name, "på": m.position > 1,
+                        "tilstand": f"{round(m.current_position())} % ({m.ha_state()})"})
+        return out
+
+    def command(self, body):
+        kind, smux, value = body.get("type"), int(body.get("id")), str(body.get("value"))
+        log.info("Kommando fra appens nettside: %s %s -> %s", kind, smux, value)
+        if kind == "lys":
+            pct = max(0, min(100, int(float(value))))
+            payload = {"state": "OFF"} if pct == 0 else {"state": "ON", "brightness": pct}
+            _queue_command("light", smux, json.dumps(payload).encode())
+        elif kind == "bryter":
+            _queue_command("switch", smux, b"ON" if value.upper() == "ON" else b"OFF")
+        elif kind == "markise":
+            if value not in ("ut", "inn", "stopp"):
+                return {"ok": False, "feil": "ukjent markise-handling"}
+            MARKISER_CTRL.enqueue(smux, value)
+        else:
+            return {"ok": False, "feil": "ukjent type"}
+        return {"ok": True}
+
+    def scan_start(self):
+        return {"ok": SCANNER.start()}
+
+    def scan_info(self):
+        known = REG["light_ids"] | REG["switch_ids"] | REG["binary_ids"] | REG["sensor_ids"] | \
+            REG["thermo_ids"] | set(REG["button_ids"]) | REG["markise_ids"]
+        cands = scanner.candidates(SCANNER.objects, known)
+        try:
+            with open(EXTRA_FILE, encoding="utf-8") as f:
+                extra = json.load(f)
+        except Exception:  # noqa: BLE001
+            extra = {}
+        for kind in cands:
+            added = {x["id"] for x in extra.get(kind, [])}
+            for item in cands[kind]:
+                item["lagt_til"] = item["id"] in added
+        return {"status": SCANNER.status(), "kandidater": cands}
+
+    def add_extra(self, body):
+        try:
+            with open(EXTRA_FILE, encoding="utf-8") as f:
+                extra = json.load(f)
+        except Exception:  # noqa: BLE001
+            extra = {}
+        known = REG["light_ids"] | REG["switch_ids"] | REG["binary_ids"] | REG["sensor_ids"] | \
+            REG["thermo_ids"] | set(REG["button_ids"]) | REG["markise_ids"]
+        cands = scanner.candidates(SCANNER.objects, known)
+        added = []
+        for kind in ("lys", "brytere", "knapper"):
+            for oid in body.get(kind, []):
+                item = next((c for c in cands[kind] if c["id"] == int(oid)), None)
+                if item and not any(x["id"] == item["id"] for x in extra.get(kind, [])):
+                    extra.setdefault(kind, []).append(item)
+                    added.append(item["navn"])
+        with open(EXTRA_FILE, "w", encoding="utf-8") as f:
+            json.dump(extra, f, indent=2, ensure_ascii=False)
+        if added:
+            load_extras()
+            ids = rebuild_registry()
+            if LINK:
+                LINK.subscribe(ids)
+            client = MQTT_STATE["client"]
+            if client:
+                publish_discovery(client)
+            log.info("La til fra nettsiden: %s", ", ".join(added))
+        return {"ok": True, "lagt_til": added}
+
+    def cache(self):
+        return xc.load_cache()
 
 
 # ------------------------------------------------------------------ main --
@@ -1377,7 +1757,20 @@ def main():
     client.reconnect_delay_set(min_delay=1, max_delay=60)
 
     MARKISER_CTRL.client = client
-    start_health_server()
+
+    global LINK
+    merge_seed_cache()
+    load_extras()
+    ids = rebuild_registry()
+    if OPTS["hurtig_status"]:
+        LINK = hm_link.HMLink(on_hm_object, on_hm_ack, on_hm_other)
+        LINK.subscribe(ids)
+        threading.Thread(target=LINK.run, daemon=True, name="lytter").start()
+        log.info("Hurtig status er PAA: lytter paa %d objekter i Home Manager", len(ids))
+    else:
+        log.info("Hurtig status er AV: bruker bare polling hvert %ss", OPTS["poll_interval"])
+    threading.Thread(target=housekeeping, args=(client,), daemon=True, name="husholdning").start()
+    web.start(Api(), HEALTH_PORT)
     threading.Thread(target=poll_loop, args=(client,), daemon=True, name="poll").start()
     threading.Thread(target=command_batch_worker, args=(client,), daemon=True, name="bolk").start()
     threading.Thread(target=MARKISER_CTRL.run, args=(client,), daemon=True, name="markise").start()

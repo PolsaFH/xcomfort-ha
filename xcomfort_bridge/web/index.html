@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xComfort-bro</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1c1f24;--mut:#6b7280;--line:#e5e7eb;--acc:#0b72e7;--ok:#16a34a;--warn:#d97706;--err:#dc2626;--chip:#eef2f7}
+@media (prefers-color-scheme:dark){:root{--bg:#111418;--card:#1a1e24;--fg:#e8eaed;--mut:#9aa3ad;--line:#2a3038;--acc:#4ea1ff;--chip:#242a32}}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:2}
+header h1{font-size:17px;margin:0;font-weight:600}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--mut);display:inline-block}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.err{background:var(--err)}
+nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+nav button{background:none;border:0;color:var(--mut);padding:7px 11px;border-radius:8px;font:inherit;cursor:pointer}
+nav button.on{background:var(--chip);color:var(--fg);font-weight:600}
+main{padding:16px 18px;max-width:1100px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h3{margin:0 0 8px;font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.big{font-size:22px;font-weight:600}
+.row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .name{flex:1;min-width:0}
+.row small{color:var(--mut)}
+.btn{border:1px solid var(--line);background:var(--chip);color:var(--fg);border-radius:8px;padding:5px 10px;font:inherit;cursor:pointer}
+.btn:hover{border-color:var(--acc)}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.zone{margin:18px 0 6px;font-weight:600}
+pre{margin:0;white-space:pre-wrap;word-break:break-word;font:12px/1.5 ui-monospace,Consolas,monospace}
+.log{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;height:65vh;overflow:auto}
+.l-WARNING{color:var(--warn)}.l-ERROR{color:var(--err)}.l-DEBUG{color:var(--mut)}
+.bar{height:8px;background:var(--chip);border-radius:6px;overflow:hidden}.bar>div{height:100%;background:var(--acc)}
+input[type=search]{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit;width:100%;max-width:320px}
+.tools{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.muted{color:var(--mut)}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+.state-on{color:var(--ok);font-weight:600}
+</style>
+</head>
+<body>
+<header>
+  <span id="dot" class="dot"></span><h1>xComfort-bro</h1><span id="ver" class="muted"></span>
+  <nav id="tabs">
+    <button data-t="oversikt" class="on">Oversikt</button>
+    <button data-t="enheter">Enheter</button>
+    <button data-t="logg">Logg</button>
+    <button data-t="raa">Rå trafikk</button>
+    <button data-t="verktoy">Verktøy</button>
+  </nav>
+</header>
+<main>
+<section id="oversikt"></section>
+<section id="enheter" hidden>
+  <div class="tools"><input id="filter" type="search" placeholder="Søk etter lys, bryter, rom …"></div>
+  <div id="devlist"></div>
+</section>
+<section id="logg" hidden>
+  <div class="tools"><input id="logfilter" type="search" placeholder="Filtrer loggen …"><label><input type="checkbox" id="logpause"> Pause</label></div>
+  <div class="log"><pre id="logbox"></pre></div>
+</section>
+<section id="raa" hidden>
+  <p class="muted">Alt Home Manager sender på lytte-forbindelsen, akkurat som det kommer. Nyttig når vi feilsøker.</p>
+  <div class="tools"><input id="rawfilter" type="search" placeholder="Filtrer, f.eks. et objektnummer …"><label><input type="checkbox" id="rawpause"> Pause</label></div>
+  <div class="log"><pre id="rawbox"></pre></div>
+</section>
+<section id="verktoy" hidden></section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const api=(p,o)=>fetch(p,o).then(r=>r.json());
+const post=(p,b)=>api(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})});
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let tab="oversikt";
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{
+  tab=b.dataset.t;document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===b));
+  document.querySelectorAll("main>section").forEach(s=>s.hidden=s.id!==tab);refresh();});
+
+function card(t,v,sub){return `<div class="card"><h3>${esc(t)}</h3><div class="big">${v}</div>${sub?`<small class="muted">${sub}</small>`:""}</div>`}
+async function loadStatus(){
+  const s=await api("api/status");
+  $("#ver").textContent="v"+s.versjon;
+  $("#dot").className="dot "+(s.lytter_ok&&s.mqtt?"ok":(s.mqtt?"warn":"err"));
+  if(tab!=="oversikt")return;
+  const m=s.markiser.map(x=>`<div class="row"><span class="name">${esc(x.navn)}</span><b>${x.posisjon} %</b><small>${esc(x.tilstand)}</small></div>`).join("");
+  const r=s.responstider.slice(-8).reverse().map(x=>`<div class="row"><span class="name">${esc(x.navn)}</span><b>${x.sek.toFixed(1)} s</b><small>${esc(x.tid)}</small></div>`).join("")||'<p class="muted">Ingen målinger ennå. Skru et lys av/på fra HA.</p>';
+  $("#oversikt").innerHTML=`<div class="grid">
+   ${card("Home Manager",s.lytter_ok?"Tilkoblet":"Ikke tilkoblet",s.lytter_ok?`Øyeblikkelig status, siste melding ${s.siste_melding_sek}s siden`:"Bruker vanlig avlesning")}
+   ${card("MQTT",s.mqtt?"Tilkoblet":"Frakoblet","Megler: "+esc(s.mqtt_host))}
+   ${card("Kommandoer",s.sendt,`${s.feilet} feilet`)}
+   ${card("Lys bekreftet",s.bekreftet,`${s.ubekreftet} ubekreftet · snitt ${s.snitt_respons??"–"} s`)}
+   ${card("Radiokvitteringer",s.radio_5min,"siste 5 minutter")}
+   ${card("Avlesning",s.poll_modus,`siste runde ${s.poll_sek}s`)}
+  </div>
+  <div class="grid" style="margin-top:12px">
+   <div class="card"><h3>Markiser (anslått posisjon)</h3>${m}</div>
+   <div class="card"><h3>Responstid lys (kommando → lampa bekrefter)</h3>${r}</div>
+   <div class="card"><h3>Siste feil</h3><p>${esc(s.siste_feil)}</p></div>
+  </div>`;
+}
+let devs=null;
+async function loadDevices(){
+  devs=await api("api/devices");renderDevices();
+}
+function renderDevices(){
+  if(!devs)return;const q=($("#filter").value||"").toLowerCase();const zones={};
+  for(const d of devs){if(q&&!(d.navn+" "+d.sone+" "+d.id+" "+d.type).toLowerCase().includes(q))continue;(zones[d.sone]=zones[d.sone]||[]).push(d);}
+  $("#devlist").innerHTML=Object.keys(zones).sort().map(z=>`<div class="zone">${esc(z)}</div><div class="card">`+zones[z].map(d=>{
+    let b="";if(d.type==="lys")b=`<button class="btn" data-c="lys:${d.id}:0">Av</button><button class="btn" data-c="lys:${d.id}:30">30%</button><button class="btn" data-c="lys:${d.id}:100">100%</button>`;
+    else if(d.type==="bryter")b=`<button class="btn" data-c="bryter:${d.id}:OFF">Av</button><button class="btn" data-c="bryter:${d.id}:ON">På</button>`;
+    else if(d.type==="markise")b=`<button class="btn" data-c="markise:${d.id}:inn">Inn</button><button class="btn" data-c="markise:${d.id}:stopp">Stopp</button><button class="btn" data-c="markise:${d.id}:ut">Ut</button>`;
+    return `<div class="row"><span class="name">${esc(d.navn)} <small>${esc(d.type)} · ${d.id}</small></span><span class="${d.på?"state-on":"muted"}">${esc(d.tilstand)}</span>${b}</div>`}).join("")+"</div>").join("");
+  document.querySelectorAll("[data-c]").forEach(e=>e.onclick=async()=>{const[t,id,v]=e.dataset.c.split(":");await post("api/cmd",{type:t,id:+id,value:v});setTimeout(loadDevices,1500);});
+}
+$("#filter").oninput=renderDevices;
+const cursors={log:0,raw:0};
+async function tail(kind,box,filter,pause){
+  if($(pause).checked)return;
+  const lines=await api(`api/${kind}?after=${cursors[kind]}`);if(!lines.length)return;
+  cursors[kind]=lines[lines.length-1].n;const f=($(filter).value||"").toLowerCase();
+  const el=$(box);const atBottom=el.parentElement.scrollTop+el.parentElement.clientHeight>=el.parentElement.scrollHeight-30;
+  el.insertAdjacentHTML("beforeend",lines.filter(l=>!f||l.t.toLowerCase().includes(f)).map(l=>`<span class="l-${l.l}">${esc(l.t)}</span>\n`).join(""));
+  while(el.childNodes.length>3000)el.removeChild(el.firstChild);
+  if(atBottom)el.parentElement.scrollTop=el.parentElement.scrollHeight;
+}
+async function loadTools(){
+  const s=await api("api/scan");const c=s.kandidater;
+  const list=(arr,kind)=>arr.length?arr.map(x=>`<div class="row"><span class="name">${esc(x.navn)} <small>${esc(x.objekt)} · ${x.id}</small></span>${x.lagt_til?'<small class="state-on">lagt til</small>':`<button class="btn" data-add="${kind}:${x.id}">Legg til i HA</button>`}</div>`).join(""):'<p class="muted">Ingen.</p>';
+  $("#verktoy").innerHTML=`<div class="grid" style="grid-template-columns:1fr">
+   <div class="card"><h3>Søk etter nye enheter</h3>
+    <p>Går gjennom alle objektene i Home Manager og finner lys, brytere og knapper som broen ikke kjenner til ennå. Tar 10–20 minutter, men påvirker ikke radioen.</p>
+    ${s.status.running?`<div class="bar"><div style="width:${Math.round(s.status.progress*100)}%"></div></div><p class="muted">${Math.round(s.status.progress*100)} % · ${s.status.found} objekter funnet så langt</p>`:
+     `<button class="btn pri" id="scan">Start søk</button> <span class="muted">${s.status.finished?`Sist kjørt ${esc(s.status.finished)}: ${s.status.objects} objekter`:"Ikke kjørt ennå"}${s.status.error?` · Feil: ${esc(s.status.error)}`:""}</span>`}
+   </div>
+   <div class="card"><h3>Nye dimbare lys</h3>${list(c.lys,"lys")}</div>
+   <div class="card"><h3>Nye av/på-brytere</h3>${list(c.brytere,"brytere")}</div>
+   <div class="card"><h3>Knapper og innganger (blir hendelser i HA)</h3>${list(c.knapper,"knapper")}</div>
+   <div class="card"><h3>Sikkerhetskopi</h3><p>Lista over styre-objekter for alle lys, så en ny installasjon starter raskt.</p><a class="btn" href="api/cache" download="xcomfort_object_cache.json">Last ned</a></div>
+  </div>`;
+  const b=$("#scan");if(b)b.onclick=async()=>{await post("api/scan/start");loadTools();};
+  document.querySelectorAll("[data-add]").forEach(e=>e.onclick=async()=>{const[k,id]=e.dataset.add.split(":");await post("api/extra",{[k]:[+id]});loadTools();});
+}
+async function refresh(){
+  try{
+    await loadStatus();
+    if(tab==="enheter"&&!devs)await loadDevices();
+    if(tab==="logg")await tail("log","#logbox","#logfilter","#logpause");
+    if(tab==="raa")await tail("raw","#rawbox","#rawfilter","#rawpause");
+    if(tab==="verktoy")await loadTools();
+  }catch(e){$("#dot").className="dot err";}
+}
+refresh();setInterval(refresh,2000);setInterval(()=>{if(tab==="enheter")loadDevices();},10000);
+</script>
+</body>
+</html>

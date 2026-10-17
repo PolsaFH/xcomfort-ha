@@ -5,3 +5,6 @@ Anlagenkonfiguration*
 __pycache__/
 *.pyc
 diagnose_logg_*
+
+# Unntak: liste over styre-objekter (bare ID-er, ingen hemmeligheter)
+!xcomfort_bridge/seed_cache.json
