@@ -133,6 +133,7 @@ async function loadTools(){
   const s=await api("api/scan");const c=s.kandidater;
   const list=(arr,kind)=>arr.length?arr.map(x=>`<div class="row"><span class="name">${esc(x.navn)} <small>${esc(x.objekt)} · ${x.id}</small></span>${x.lagt_til?'<small class="state-on">lagt til</small>':`<button class="btn" data-add="${kind}:${x.id}">Legg til i HA</button>`}</div>`).join(""):'<p class="muted">Ingen.</p>';
   $("#vdyn").innerHTML=`<div class="grid" style="grid-template-columns:1fr">
+   ${(s.nylig||[]).length?`<div class="card"><h3>Knapper du nettopp har trykket på</h3><p class="muted">Disse har sendt noe til Home Manager, men er ikke lagt til i HA ennå.</p>${s.nylig.map(x=>`<div class="row"><span class="name">${esc(x.navn)} <small>${esc(x.objekt)} · ${x.id} · ${x.sek_siden<120?x.sek_siden+" s":Math.round(x.sek_siden/60)+" min"} siden</small></span><button class="btn pri" data-addobj="${x.id}">Legg til som knapp</button></div>`).join("")}</div>`:""}
    <div class="card"><h3>Søk etter nye enheter</h3>
     <p>Går gjennom alle objektene i Home Manager og finner lys, brytere og knapper som broen ikke kjenner til ennå. Tar 10–20 minutter, men påvirker ikke radioen. Nye ting fra MRF havner ofte sist i lista.</p>
     ${s.status.running?`<div class="bar"><div style="width:${Math.round(s.status.progress*100)}%"></div></div><p class="muted">${Math.round(s.status.progress*100)} % · ${s.status.found} objekter funnet så langt</p>`:
@@ -145,6 +146,7 @@ async function loadTools(){
   </div>`;
   const b=$("#scan");if(b)b.onclick=async()=>{await post("api/scan/start");loadTools();};
   document.querySelectorAll("[data-add]").forEach(e=>e.onclick=async()=>{const[k,id]=e.dataset.add.split(":");await post("api/extra",{[k]:[+id]});loadTools();});
+  document.querySelectorAll("#vdyn [data-addobj]").forEach(e=>e.onclick=async()=>{e.disabled=true;await post("api/extra",{knapper:[+e.dataset.addobj]});allCount=-1;loadTools();});
   await loadAll(s.status.objects+"/"+(s.status.finished||""));
 }
 document.addEventListener("input",e=>{if(e.target.id==="objsok"&&allObj)loadAll(allCount);});

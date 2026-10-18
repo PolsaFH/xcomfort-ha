@@ -1,5 +1,12 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.2.3 (2026-10-18)
+
+### Nytt
+- Verktøy viser øverst «Knapper du nettopp har trykket på»: innganger som
+  har sendt noe, men ikke er lagt til ennå. De kan legges til med ett trykk,
+  uten å vente på et fullt søk.
+
 ## 2.2.2 (2026-10-18)
 
 ### Rettet

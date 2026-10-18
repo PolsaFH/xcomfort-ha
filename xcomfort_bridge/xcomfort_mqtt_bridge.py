@@ -46,7 +46,7 @@ import scanner
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.2.2"
+BRIDGE_VERSION = "2.2.3"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -1608,10 +1608,16 @@ def on_hm_object(oid, name, fields):
             client.publish(event_topic(fkey), json.dumps({"event_type": KNAPP_KODER.get(kode, f"kode_{min(kode, 9)}"), "kode": kode}),
                            qos=0, retain=False)
     elif name.startswith("IN_") and oid not in REG["alias"] and not quiet:
+        RECENT_UNKNOWN[oid] = (name, time.time())
         log.info("Ukjent knapp/inngang %s (%d) sendte %s -- kan legges til under Verktøy i appen",
                  name, oid, " ".join(fields))
     if oid in REG["markise_ids"]:
         mlog.debug("Markise-objekt %s: %s", REG["names"].get(oid, oid), " ".join(fields))
+
+
+# Innganger som har sendt noe, men som ikke er lagt til ennå: {id: (navn, tid)}.
+# Vises øverst i Verktøy så de kan legges til uten et fullt søk.
+RECENT_UNKNOWN = {}
 
 
 def on_hm_ack(kind):
@@ -1753,7 +1759,12 @@ class Api:
             added = {x["id"] for x in extra.get(kind, [])}
             for item in cands[kind]:
                 item["lagt_til"] = item["id"] in added
-        return {"status": SCANNER.status(), "kandidater": cands}
+        now = time.time()
+        nylig = [{"id": oid, "objekt": name, "navn": scanner.pretty(name.split("_", 1)[-1]),
+                  "sek_siden": round(now - t)}
+                 for oid, (name, t) in sorted(RECENT_UNKNOWN.items(), key=lambda x: -x[1][1])
+                 if oid not in REG["alias"] and now - t < 24 * 3600]
+        return {"status": SCANNER.status(), "kandidater": cands, "nylig": nylig}
 
     def _known(self):
         return (REG["light_ids"] | REG["switch_ids"] | REG["binary_ids"] | REG["sensor_ids"]
@@ -1777,9 +1788,10 @@ class Api:
         for kind in ("lys", "brytere", "knapper"):
             for oid in body.get(kind, []):
                 item = next((c for c in cands[kind] if c["id"] == int(oid)), None)
-                if item is None and kind == "knapper" and int(oid) in SCANNER.objects:
+                if item is None and kind == "knapper" and \
+                        (int(oid) in SCANNER.objects or int(oid) in RECENT_UNKNOWN):
                     # Hvilket som helst objekt kan foelges som knapp/hendelse
-                    name = SCANNER.objects[int(oid)][0]
+                    name = (SCANNER.objects.get(int(oid)) or RECENT_UNKNOWN[int(oid)])[0]
                     item = {"id": int(oid), "navn": scanner.pretty(name.split("_", 1)[-1]), "objekt": name}
                 if item and not any(x["id"] == item["id"] for x in extra.get(kind, [])):
                     extra.setdefault(kind, []).append(item)
