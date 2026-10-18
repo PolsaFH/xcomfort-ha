@@ -41,11 +41,12 @@ import time
 import paho.mqtt.client as mqtt
 
 import hm_link
+import idmap
 import scanner
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.1.3"
+BRIDGE_VERSION = "2.2.0"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -1276,11 +1277,12 @@ def poll_switches(client, conn):
 
 
 def poll_binary_sensors(client, conn):
-    ids = [s for _, _, s, _ in BINARY_SENSORS]
+    keys = [s for _, _, s, _ in BINARY_SENSORS]
+    ids = [IDMAP.cur(k) for k in keys]
     found = {int(o): float(v) for o, v in SWITCH_STATE_RE.findall(_batch_d_obj(conn, ids, wait=0.8))}
-    for smux_id in ids:
-        if smux_id in found:
-            publish_state(client, binary_sensor_state_topic(smux_id), "ON" if found[smux_id] > 0 else "OFF")
+    for key in keys:
+        if IDMAP.cur(key) in found:
+            publish_state(client, binary_sensor_state_topic(key), "ON" if found[IDMAP.cur(key)] > 0 else "OFF")
 
 
 def poll_continuous_sensors(client, conn):
@@ -1369,6 +1371,7 @@ REG = {
     "button_ids": {},     # IN_-id -> navn
     "markise_ids": set(),
     "names": {},          # smux -> "Sone Navn" (for logg/nettside)
+    "alias": {},          # nåværende nr -> nøkkel for innganger (idmap.py)
 }
 
 # Knapper/innganger som blir hendelser (event) i HA. Markiseknappene er
@@ -1396,6 +1399,23 @@ SCAN_FILE = "/data/objekter.json" if os.path.isdir("/data") else \
 SEED_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seed_cache.json")
 
 SCANNER = scanner.Scanner(SCAN_FILE)
+ID_MAP_FILE = "/data/id_map.json" if os.path.isdir("/data") else \
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "id_map.json")
+IDMAP = idmap.IdMap(ID_MAP_FILE)
+
+# Navnet i Home Manager for objekter som kan bli nummerert om ved opplasting
+# fra xSetup (innganger). Nøkkelen (det opprinnelige nummeret) brukes fortsatt
+# i unique_id og MQTT-topics, så HA merker ingenting.
+OBJEKT_NAVN = {
+    234899: "IN_Ventilasjon_Drift",
+    231939: "IN_Ventilasjon_Tettfilter",
+    232677: "IN_Ventilasjon_Overoppheting",
+    232304: "IN_Ute_BRMarkise1",
+    234213: "IN_Ute_BRMarkise2",
+    233840: "IN_Ute_BRMarkise3",
+}
+for _k, _n in OBJEKT_NAVN.items():
+    IDMAP.expect(_k, _n)
 
 
 def event_topic(i):
@@ -1482,6 +1502,7 @@ def load_extras():
         if item["id"] in known:
             continue
         BUTTONS.append((item.get("sone", "Knapper"), item["navn"], item["id"]))
+        IDMAP.expect(item["id"], item.get("objekt"))
     if changed:
         xc.save_cache(cache)
     log.info("Ekstra enheter fra nettsiden: %d lys, %d brytere, %d knapper",
@@ -1515,14 +1536,16 @@ def rebuild_registry():
     REG["light_ids"] = {s for _, _, s in xc.LIGHTS}
     REG["switch_ids"] = {s for _, _, s in xc.SWITCHES}
     REG["binary_ids"] = {s for _, _, s, _ in BINARY_SENSORS}
+    REG["alias"] = IDMAP.alias()
     REG["sensor_ids"] = {s for _, _, s, _ in CONTINUOUS_SENSORS}
     REG["thermo_ids"] = {s for _, _, s in xc.THERMOSTATS}
     REG["button_ids"] = {oid: f"{zone} {name}" for zone, name, oid in BUTTONS}
     REG["markise_ids"] = {s for _, _, s in xc.MARKISER}
     for zone, name, smux in xc.SWITCHES + xc.MARKISER:
         REG["names"][smux] = f"{zone} {name}"
-    ids = (set(REG["val_to_light"]) | REG["light_ids"] | REG["switch_ids"] | REG["binary_ids"]
-           | REG["sensor_ids"] | REG["thermo_ids"] | set(REG["button_ids"]) | REG["markise_ids"])
+    followed = {IDMAP.cur(k) for k in REG["binary_ids"] | set(REG["button_ids"])}
+    ids = (set(REG["val_to_light"]) | REG["light_ids"] | REG["switch_ids"] | followed
+           | REG["sensor_ids"] | REG["thermo_ids"] | REG["markise_ids"])
     return ids
 
 
@@ -1559,10 +1582,13 @@ def on_hm_object(oid, name, fields):
         v = _num(fields, 2)
         if v is not None:
             publish_switch_state(client, oid, v > 0)
-    if oid in REG["binary_ids"]:
+    # Innganger kan ha fått nytt nummer -- slå opp nøkkelen (se idmap.py)
+    fkey = REG["alias"].get(oid, oid) if oid in REG["alias"] else \
+        (None if oid in REG["binary_ids"] | set(REG["button_ids"]) else oid)
+    if fkey in REG["binary_ids"]:
         v = _num(fields, 2)
         if v is not None:
-            publish_state(client, binary_sensor_state_topic(oid), "ON" if v > 0 else "OFF")
+            publish_state(client, binary_sensor_state_topic(fkey), "ON" if v > 0 else "OFF")
     if oid in REG["sensor_ids"]:
         v = _num(fields, 3)
         if v is not None:
@@ -1574,14 +1600,14 @@ def on_hm_object(oid, name, fields):
     # Et svar paa et d_obj-spoersmaal (fra skanneren eller en annen klient)
     # ser ut som en hendelse -- ignorer knapper mens skanneren gaar.
     quiet = LINK is None or LINK.recently_subscribed(oid) or SCANNER.running
-    if oid in REG["button_ids"]:
+    if fkey in REG["button_ids"]:
         code = _num(fields, 2)
         if code is not None and not quiet:
             kode = int(code)
-            log.info("Knapp %s: %s (kode %d)", REG["button_ids"][oid], KNAPP_KODER.get(kode, "?"), kode)
-            client.publish(event_topic(oid), json.dumps({"event_type": KNAPP_KODER.get(kode, f"kode_{min(kode, 9)}"), "kode": kode}),
+            log.info("Knapp %s: %s (kode %d)", REG["button_ids"][fkey], KNAPP_KODER.get(kode, "?"), kode)
+            client.publish(event_topic(fkey), json.dumps({"event_type": KNAPP_KODER.get(kode, f"kode_{min(kode, 9)}"), "kode": kode}),
                            qos=0, retain=False)
-    elif name.startswith("IN_") and oid not in REG["binary_ids"] and not quiet:
+    elif name.startswith("IN_") and oid not in REG["alias"] and not quiet:
         log.info("Ukjent knapp/inngang %s (%d) sendte %s -- kan legges til under Verktøy i appen",
                  name, oid, " ".join(fields))
     if oid in REG["markise_ids"]:
@@ -1595,6 +1621,30 @@ def on_hm_ack(kind):
 
 def on_hm_other(text):
     web.RAW_RING.add(f"{web.ts()}  {text}")
+
+
+def id_watch():
+    """Sjekker at innganger har samme nummer som før: ved oppstart, hver 6.
+    time og etter hvert fulle søk fra nettsiden."""
+    time.sleep(10)
+    last_scan = SCANNER.finished
+    next_check = 0.0
+    while True:
+        if time.time() >= next_check or SCANNER.finished != last_scan:
+            last_scan = SCANNER.finished
+            next_check = time.time() + 6 * 3600
+            if not SCANNER.running:
+                try:
+                    changes = IDMAP.verify(SCANNER.objects)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("Klarte ikke sjekke objektnumre: %s", e)
+                    next_check = time.time() + 600
+                    changes = []
+                if changes:
+                    ids = rebuild_registry()
+                    if LINK:
+                        LINK.subscribe(ids)
+        time.sleep(30)
 
 
 def housekeeping(client):
@@ -1788,6 +1838,7 @@ def main():
     else:
         log.info("Hurtig status er AV: bruker bare polling hvert %ss", OPTS["poll_interval"])
     threading.Thread(target=housekeeping, args=(client,), daemon=True, name="husholdning").start()
+    threading.Thread(target=id_watch, daemon=True, name="idsjekk").start()
     web.start(Api(), HEALTH_PORT)
     threading.Thread(target=poll_loop, args=(client,), daemon=True, name="poll").start()
     threading.Thread(target=command_batch_worker, args=(client,), daemon=True, name="bolk").start()

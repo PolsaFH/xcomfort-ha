@@ -1,5 +1,15 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.2.0 (2026-10-18)
+
+### Rettet
+- **Ventilasjonsvarslene (Drift, Tett filter, Overoppheting) sluttet å
+  oppdatere seg etter opplasting fra xSetup.** Home Manager nummererte om 506
+  objekter, blant dem alle innganger. Broen følger nå med på innganger og
+  knapper ved NAVN: den sjekker ved oppstart, hver 6. time og etter hvert
+  fulle søk i Verktøy, og finner selv det nye nummeret. Ingenting endres i
+  HA (samme entity_id og unique_id). Endringer skrives i loggen.
+
 ## 2.1.3 (2026-10-18)
 
 ### Endret

@@ -29,8 +29,9 @@ class FakeHM:
     """Liten falsk Home Manager. Svarer med handshake, svarer paa d_obj med
     en SSN-linje, og husker alle kommandoer med tidsstempel."""
 
-    def __init__(self, handshake=True, values=None, ack_ids=(), idle_timeout=5, exists=None):
+    def __init__(self, handshake=True, values=None, ack_ids=(), idle_timeout=5, exists=None, names=None):
         self.handshake = handshake
+        self.names = names or {}
         self.exists = set(exists) if exists is not None else None  # None = alle ID-er finnes
         self.idle_timeout = idle_timeout
         self.ack_ids = set(ack_ids)   # markiser som "kvitterer" (som ekte aktuatorer)
@@ -86,7 +87,7 @@ class FakeHM:
                         if self.exists is not None and oid not in self.exists:
                             continue
                         val = self.values.get(oid, 0)
-                        c.sendall(f"\x01SSN {oid} OBJ_{oid} 23 1 0 {val}\x02\x00".encode())
+                        c.sendall(f"\x01SSN {oid} {self.names.get(oid, f'OBJ_{oid}')} 23 1 0 {val}\x02\x00".encode())
         except OSError:
             pass
         finally:
@@ -115,7 +116,7 @@ def load_bridge(fake, **options):
     """Laster broen paa nytt med gitte innstillinger og peker den mot den
     falske Home Manager-en."""
     tmp = tempfile.mkdtemp()
-    for mod in ("xcomfort_mqtt_bridge", "xcomfort_local_control", "hm_link", "scanner", "web"):
+    for mod in ("xcomfort_mqtt_bridge", "xcomfort_local_control", "hm_link", "scanner", "web", "idmap"):
         sys.modules.pop(mod, None)
     import xcomfort_local_control as xc
     xc.CACHE_FILE = os.path.join(tmp, "cache.json")
@@ -126,6 +127,8 @@ def load_bridge(fake, **options):
     bro.POSITION_FILE = os.path.join(tmp, "pos.json")
     bro.EXTRA_FILE = os.path.join(tmp, "ekstra.json")
     bro.SCANNER = bro.scanner.Scanner(os.path.join(tmp, "objekter.json"))
+    bro.IDMAP.path = os.path.join(tmp, "id_map.json")
+    bro.IDMAP.current = {}
     bro.MARKISER_CTRL = bro.MarkiseController()
     for m in bro.MARKISER_CTRL.markiser.values():
         m.position = 0.0
@@ -469,6 +472,60 @@ class TestSkannerFortsetter(unittest.TestCase):
                 scanner.WAIT_S, scanner.EMPTY_GAP = old
             self.assertEqual(sorted(sc.objects), [5, 1500, 2600, 4100])
             self.assertIsNone(sc.error)
+        finally:
+            fake.close()
+
+
+class TestNyeNumre(unittest.TestCase):
+    """xSetup kan nummerere om innganger (18.10.2026: Tett filter 231939 ->
+    232053). Broen skal finne dem igjen på navn, uten å endre noe i HA."""
+
+    def test_finner_nytt_nummer_og_publiserer_paa_samme_topic(self):
+        names = {232053: "IN_Ventilasjon_Tettfilter", 234899: "IN_Ventilasjon_Drift",
+                 235013: "IN_Ventilasjon_Drift_x", 232677: "IN_Ventilasjon_Overoppheting",
+                 232304: "IN_Ute_BRMarkise1", 234213: "IN_Ute_BRMarkise2", 233840: "IN_Ute_BRMarkise3",
+                 231939: "IN_Noe_Annet"}
+        fake = FakeHM(idle_timeout=30, exists=set(names), names=names)
+        try:
+            bro, xc = load_bridge(fake)
+            import idmap
+            old = idmap.WINDOW
+            idmap.WINDOW, idmap.WAIT_S = 500, 0.02
+            try:
+                changes = bro.IDMAP.verify({})
+            finally:
+                idmap.WINDOW, idmap.WAIT_S = old, 0.25
+            self.assertEqual([(c[0], c[3]) for c in changes], [(231939, 232053)])
+            self.assertEqual(bro.IDMAP.cur(231939), 232053)
+            self.assertEqual(bro.IDMAP.cur(234899), 234899)
+            ids = bro.rebuild_registry()
+            self.assertIn(232053, ids)
+            self.assertNotIn(231939, ids)
+            client = FakeClient()
+            bro.MQTT_STATE["client"] = client
+            bro.on_hm_object(232053, "IN_Ventilasjon_Tettfilter", ["11", "1", "1", "0"])
+            self.assertEqual(client.last(bro.binary_sensor_state_topic(231939)), "ON")
+            # Det GAMLE nummeret er nå et annet objekt og skal ikke påvirke sensoren
+            bro.on_hm_object(231939, "IN_Noe_Annet", ["11", "1", "0", "0"])
+            self.assertEqual(client.last(bro.binary_sensor_state_topic(231939)), "ON")
+            # Lagret til neste oppstart
+            again = __import__("idmap").IdMap(bro.IDMAP.path)
+            self.assertEqual(again.cur(231939), 232053)
+        finally:
+            fake.close()
+
+    def test_bruker_siste_fulle_sok_foerst(self):
+        names = {232053: "IN_Ventilasjon_Tettfilter", 234899: "IN_Ventilasjon_Drift",
+                 232677: "IN_Ventilasjon_Overoppheting", 232304: "IN_Ute_BRMarkise1",
+                 234213: "IN_Ute_BRMarkise2", 233840: "IN_Ute_BRMarkise3"}
+        fake = FakeHM(idle_timeout=30, exists=set(names), names=names)
+        try:
+            bro, xc = load_bridge(fake)
+            t0 = time.time()
+            changes = bro.IDMAP.verify({232053: ("IN_Ventilasjon_Tettfilter", 11)})
+            self.assertLess(time.time() - t0, 5)
+            self.assertEqual(bro.IDMAP.cur(231939), 232053)
+            self.assertEqual(len(changes), 1)
         finally:
             fake.close()
 
