@@ -22,6 +22,7 @@ import logging
 import os
 import re
 import threading
+import time
 
 import xcomfort_local_control as xc
 
@@ -39,6 +40,7 @@ class IdMap:
         self.expected = {}      # nøkkel -> forventet objektnavn
         self.current = {}       # nøkkel -> nåværende nummer
         self.lock = threading.Lock()
+        self.quiet_until = 0.0  # svar på våre egne spørsmål er ikke hendelser
         try:
             with open(path, encoding="utf-8") as f:
                 self.current = {int(k): int(v) for k, v in json.load(f).items()}
@@ -81,6 +83,17 @@ class IdMap:
         with self.lock:
             if not self.expected:
                 return []
+            self.quiet_until = float("inf")
+            try:
+                return self._verify(scanned, connect)
+            finally:
+                self.quiet_until = time.time() + 3.0
+
+    def quiet(self):
+        return time.time() < self.quiet_until
+
+    def _verify(self, scanned, connect):
+        if True:
             conn = connect()
             try:
                 now = self._ask(conn, {self.cur(k) for k in self.expected})

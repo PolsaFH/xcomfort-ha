@@ -1,5 +1,11 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.2.1 (2026-10-18)
+
+### Rettet
+- Fjernet falske «Ukjent knapp/inngang»-linjer i loggen ved oppstart. Det var
+  Home Manager sine svar på broens egen nummersjekk, ikke trykk.
+
 ## 2.2.0 (2026-10-18)
 
 ### Rettet

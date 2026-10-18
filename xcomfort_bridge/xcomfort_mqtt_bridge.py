@@ -46,7 +46,7 @@ import scanner
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.2.0"
+BRIDGE_VERSION = "2.2.1"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -1599,7 +1599,7 @@ def on_hm_object(oid, name, fields):
         publish_state(client, climate_valve_topic(oid), fields[5])
     # Et svar paa et d_obj-spoersmaal (fra skanneren eller en annen klient)
     # ser ut som en hendelse -- ignorer knapper mens skanneren gaar.
-    quiet = LINK is None or LINK.recently_subscribed(oid) or SCANNER.running
+    quiet = LINK is None or LINK.recently_subscribed(oid) or SCANNER.running or IDMAP.quiet()
     if fkey in REG["button_ids"]:
         code = _num(fields, 2)
         if code is not None and not quiet:
