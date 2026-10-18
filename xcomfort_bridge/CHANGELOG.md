@@ -1,5 +1,13 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.1.3 (2026-10-18)
+
+### Endret
+- Knappe-hendelser har nå lesbare navn i stedet for `kode_N`:
+  `kort_opp`, `kort_ned`, `langt_opp`, `langt_opp_slipp`, `langt_ned`,
+  `langt_ned_slipp`. Kartlagt med BR stue satt opp som «Generell inngang» i
+  xSetup. Selve koden følger fortsatt med som `kode`.
+
 ## 2.1.2 (2026-10-17)
 
 ### Rettet

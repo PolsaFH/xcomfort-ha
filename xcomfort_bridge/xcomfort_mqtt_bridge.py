@@ -45,7 +45,7 @@ import scanner
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.1.2"
+BRIDGE_VERSION = "2.1.3"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -1378,7 +1378,12 @@ BUTTONS = [
     ("Ute", "Markiseknapp 2", 234213),
     ("Ute", "Markiseknapp 3", 233840),
 ]
-EVENT_TYPES = [f"kode_{i}" for i in range(10)]
+# Koder fra en trykknapp satt opp som "Generell inngang" i xSetup
+# (kartlagt med BR stue 18.10.2026): kort trykk gir 1/0, langt trykk gir
+# start + slipp.
+KNAPP_KODER = {0: "kort_ned", 1: "kort_opp", 2: "langt_opp", 3: "langt_opp_slipp",
+               4: "langt_ned", 5: "langt_ned_slipp"}
+EVENT_TYPES = list(KNAPP_KODER.values()) + [f"kode_{i}" for i in range(6, 10)]
 
 # Av/paa-brytere som egentlig er lys. Med innstillingen "lysbrytere_som_lys"
 # faar disse i tillegg en ekte lys-entitet i HA (bryteren beholdes).
@@ -1573,8 +1578,8 @@ def on_hm_object(oid, name, fields):
         code = _num(fields, 2)
         if code is not None and not quiet:
             kode = int(code)
-            log.info("Knapp %s: kode %d", REG["button_ids"][oid], kode)
-            client.publish(event_topic(oid), json.dumps({"event_type": f"kode_{min(kode, 9)}", "kode": kode}),
+            log.info("Knapp %s: %s (kode %d)", REG["button_ids"][oid], KNAPP_KODER.get(kode, "?"), kode)
+            client.publish(event_topic(oid), json.dumps({"event_type": KNAPP_KODER.get(kode, f"kode_{min(kode, 9)}"), "kode": kode}),
                            qos=0, retain=False)
     elif name.startswith("IN_") and oid not in REG["binary_ids"] and not quiet:
         log.info("Ukjent knapp/inngang %s (%d) sendte %s -- kan legges til under Verktøy i appen",

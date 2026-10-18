@@ -424,7 +424,7 @@ class TestRegister(unittest.TestCase):
         self.bro.LINK.subscribed_at[oid] = 0
         self.bro.on_hm_object(oid, "IN_Test", ["11", "1", "2"])
         ev = json.loads(self.client.last(self.bro.event_topic(oid)))
-        self.assertEqual(ev, {"event_type": "kode_2", "kode": 2})
+        self.assertEqual(ev, {"event_type": "langt_opp", "kode": 2})
         self.bro.LINK = None
 
     def test_unique_id_er_uendret(self):
