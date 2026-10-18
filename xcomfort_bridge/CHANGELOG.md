@@ -1,5 +1,25 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.3.0 (2026-10-18)
+
+### Ny nettside (sidepanelet «xComfort» i HA)
+- **Hjem:** status i klartekst («Alt fungerer» eller hva som er galt),
+  nøkkeltall (lys på, responstid, kommandoer, radiotrafikk), markiser med
+  posisjon og Inn/Stopp/Ut, graf over responstid, og **«Hva skjer i
+  huset»**: en levende liste over knappetrykk, lys og brytere som endres,
+  markiser og alarmer.
+- **Rom:** alle lys, brytere, markiser og termostater gruppert per rom.
+  Trykk på et lys for av/på, dra for å dimme, «Slå av alt» per rom. Filtrer
+  på rom, type, søk eller «bare det som er på».
+- **Knapper:** alle knapper med siste trykk (lyser opp når noen trykker),
+  nye knapper legges til med ett trykk, knapper lagt til fra nettsiden kan
+  fjernes, og en forklaring av trykk-typene til bruk i automasjoner.
+- **Logg:** fargekodet, filter på nivå (alt / info / advarsler og feil),
+  søk, pause og nedlasting.
+- **Verktøy:** søk etter enheter med fremdrift, forslag, søk i alle
+  objekter, sikkerhetskopi og rå trafikk samlet ett sted.
+- Mørk modus, fungerer på mobil, og husker hvilken fane du var på.
+
 ## 2.2.4 (2026-10-18)
 
 ### Endret

@@ -46,7 +46,7 @@ import scanner
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.2.4"
+BRIDGE_VERSION = "2.3.0"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -138,6 +138,7 @@ ORIGIN = {"name": "xComfort lokal bro", "sw_version": BRIDGE_VERSION}
 
 CONTINUOUS_SENSORS = [s for s in xc.SENSORS if s[3]]
 BINARY_SENSORS = [s for s in xc.SENSORS if not s[3]]
+BINARY_NAMES = {s: f"{z} {n}" for z, n, s, _ in BINARY_SENSORS}
 
 MARKISE_COMMAND_TO_ACTION = {"OPEN": "ut", "CLOSE": "inn", "STOP": "stopp"}
 BALKONG_RESET_BUTTON_ID = "balkong_reset"
@@ -243,6 +244,21 @@ class Stats:
 
 
 STATS = Stats()
+START_TIME = time.time()
+
+# Siste kjente verdi per ting, så «Hva skjer»-lista bare viser ENDRINGER.
+LAST_SEEN = {}
+# Siste trykk per knapp: nøkkel -> (event_type, tid)
+LAST_BUTTON = {}
+
+
+def note_change(kind, key, value, text):
+    """Legger en linje i hendelseslista på nettsiden når noe faktisk endrer
+    seg (ikke ved første avlesning etter oppstart)."""
+    old = LAST_SEEN.get((kind, key), "__ny__")
+    LAST_SEEN[(kind, key)] = value
+    if old != "__ny__" and old != value:
+        web.EVENTS.add(text, kind)
 LINK = None  # settes i main() -- hm_link.HMLink
 
 # Siste publiserte retained-tilstand per emne -- sendes paa nytt naar Home
@@ -909,6 +925,12 @@ class MarkiseController:
     # -- innkommende (fra MQTT-traaden): bare legg i koen, aldri blokker --
     def enqueue(self, smux_id, action, value=None):
         self.q.put((time.time(), smux_id, action, value))
+        m = self.markiser.get(smux_id)
+        if m is not None:
+            txt = {"ut": "kjører ut", "inn": "kjører inn", "stopp": "stopp"}.get(action, str(action))
+            if value is not None:
+                txt = f"{txt} ({value})"
+            web.EVENTS.add(f"{m.name}: {txt}", "markise")
 
     def queue_length(self):
         return self.q.qsize() + len(self.scheduled)
@@ -1578,7 +1600,11 @@ def on_hm_object(oid, name, fields):
     if oid in REG["val_to_light"]:
         v = _num(fields, 3)
         if v is not None:
-            publish_light_state(client, REG["val_to_light"][oid], max(0, min(100, round(v))))
+            smux = REG["val_to_light"][oid]
+            pct = max(0, min(100, round(v)))
+            publish_light_state(client, smux, pct)
+            note_change("lys", smux, pct, f"{REG['names'].get(smux, smux)}: {pct} %" if pct else
+                        f"{REG['names'].get(smux, smux)}: av")
     if oid in REG["light_ids"]:
         level = _num(fields, 2)
         pending = PENDING_CONFIRM.get(oid)
@@ -1594,6 +1620,7 @@ def on_hm_object(oid, name, fields):
         v = _num(fields, 2)
         if v is not None:
             publish_switch_state(client, oid, v > 0)
+            note_change("bryter", oid, v > 0, f"{REG['names'].get(oid, oid)}: {'på' if v > 0 else 'av'}")
     # Innganger kan ha fått nytt nummer -- slå opp nøkkelen (se idmap.py)
     fkey = REG["alias"].get(oid, oid) if oid in REG["alias"] else \
         (None if oid in REG["binary_ids"] | set(REG["button_ids"]) else oid)
@@ -1601,6 +1628,7 @@ def on_hm_object(oid, name, fields):
         v = _num(fields, 2)
         if v is not None:
             publish_state(client, binary_sensor_state_topic(fkey), "ON" if v > 0 else "OFF")
+            note_change("alarm", fkey, v > 0, f"{BINARY_NAMES.get(fkey, fkey)}: {'AKTIV' if v > 0 else 'normal'}")
     if oid in REG["sensor_ids"]:
         v = _num(fields, 3)
         if v is not None:
@@ -1617,6 +1645,9 @@ def on_hm_object(oid, name, fields):
         if code is not None and not quiet:
             kode = int(code)
             log.info("Knapp %s: %s (kode %d)", REG["button_ids"][fkey], KNAPP_KODER.get(kode, "?"), kode)
+            etype = KNAPP_KODER.get(kode, f"kode_{kode}")
+            LAST_BUTTON[fkey] = (etype, time.time())
+            web.EVENTS.add(f"{REG['button_ids'][fkey]}: {etype.replace('_', ' ')}", "knapp")
             client.publish(event_topic(fkey), json.dumps({"event_type": KNAPP_KODER.get(kode, f"kode_{min(kode, 9)}"), "kode": kode}),
                            qos=0, retain=False)
     elif name.startswith("IN_") and oid not in REG["alias"] and not quiet:
@@ -1709,6 +1740,10 @@ class Api:
         snap = STATS.snapshot(MARKISER_CTRL.queue_length())
         return {
             "versjon": BRIDGE_VERSION,
+            "oppetid_sek": round(time.time() - START_TIME),
+            "problemer": self.health(),
+            "antall": {"lys": len(xc.LIGHTS), "brytere": len(xc.SWITCHES), "markiser": len(xc.MARKISER),
+                       "termostater": len(xc.THERMOSTATS), "knapper": len(BUTTONS)},
             "mqtt": MQTT_STATE["connected"],
             "mqtt_host": OPTS["mqtt_host"],
             "lytter_ok": bool(LINK and LINK.healthy()),
@@ -1718,8 +1753,9 @@ class Api:
             "snitt_respons": snap["resp_avg"], "radio_5min": snap["radio_5min"],
             "poll_modus": STATS.poll_modus, "poll_sek": round(STATS.poll_seconds, 1),
             "responstider": list(STATS.responstider),
-            "markiser": [{"navn": m.name, "posisjon": round(m.current_position()), "tilstand": m.ha_state()}
-                         for m in MARKISER_CTRL.markiser.values()],
+            "markiser": [{"id": sid, "navn": m.name,
+                          "posisjon": round(m.current_position()), "tilstand": m.ha_state()}
+                         for sid, m in MARKISER_CTRL.markiser.items()],
         }
 
     def devices(self):
@@ -1738,8 +1774,45 @@ class Api:
         for zone, name, smux in xc.MARKISER:
             m = MARKISER_CTRL.markiser[smux]
             out.append({"type": "markise", "id": smux, "sone": zone, "navn": name, "på": m.position > 1,
+                        "posisjon": round(m.current_position()), "bevegelse": m.ha_state(),
                         "tilstand": f"{round(m.current_position())} % ({m.ha_state()})"})
+        for zone, name, smux in xc.THERMOSTATS:
+            cur = cache.get(climate_current_topic(smux))
+            setp = cache.get(climate_temp_state_topic(smux))
+            out.append({"type": "termostat", "id": smux, "sone": zone, "navn": name, "på": False,
+                        "temp": cur, "mal": setp,
+                        "tilstand": f"{cur} °C (mål {setp} °C)" if cur else "?"})
+        for zone, name, oid in BUTTONS:
+            z2, n2 = button_label(zone, name, oid)
+            last = LAST_BUTTON.get(oid)
+            out.append({"type": "knapp", "id": oid, "sone": z2, "navn": n2, "på": False,
+                        "ekstra": zone == "Knapper",
+                        "siste": last[0] if last else None, "sek_siden": round(time.time() - last[1]) if last else None,
+                        "tilstand": last[0].replace("_", " ") if last else "ingen trykk ennå"})
         return out
+
+    def remove_extra(self, body):
+        """Fjerner en knapp som er lagt til fra nettsiden (ikke de faste)."""
+        oid = int(body.get("id"))
+        try:
+            with open(EXTRA_FILE, encoding="utf-8") as f:
+                extra = json.load(f)
+        except Exception:  # noqa: BLE001
+            extra = {}
+        before = len(extra.get("knapper", []))
+        extra["knapper"] = [x for x in extra.get("knapper", []) if int(x["id"]) != oid]
+        if len(extra["knapper"]) == before:
+            return {"ok": False, "feil": "fant ikke knappen blant de som er lagt til fra nettsiden"}
+        with open(EXTRA_FILE, "w", encoding="utf-8") as f:
+            json.dump(extra, f, indent=2, ensure_ascii=False)
+        BUTTONS[:] = [b for b in BUTTONS if not (b[2] == oid and b[0] == "Knapper")]
+        IDMAP.expected.pop(oid, None)
+        rebuild_registry()
+        client = MQTT_STATE["client"]
+        if client:
+            client.publish(f"{DISCOVERY_PREFIX}/event/xcomfort_in_{oid}/config", "", qos=1, retain=True)
+        log.info("Fjernet knapp %s fra HA (fra nettsiden)", oid)
+        return {"ok": True}
 
     def command(self, body):
         kind, smux, value = body.get("type"), int(body.get("id")), str(body.get("value"))

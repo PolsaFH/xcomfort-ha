@@ -44,7 +44,7 @@ class Ring(logging.Handler):
     def add(self, text, level="INFO"):
         with self._ring_lock:
             self.counter += 1
-            self.lines.append({"n": self.counter, "t": text, "l": level})
+            self.lines.append({"n": self.counter, "t": text, "l": level, "ts": round(time.time(), 1)})
 
     def since(self, n):
         with self._ring_lock:
@@ -53,6 +53,7 @@ class Ring(logging.Handler):
 
 LOG_RING = Ring(800)
 RAW_RING = Ring(800)
+EVENTS = Ring(300)   # «Hva skjer» i huset: knappetrykk, lys, brytere, markiser
 
 
 def make_handler(api):
@@ -96,6 +97,8 @@ def make_handler(api):
                     return self._send(200, api.status())
                 if path == "/api/log":
                     return self._send(200, LOG_RING.since(int(query.get("after", 0))))
+                if path == "/api/events":
+                    return self._send(200, EVENTS.since(int(query.get("after", 0))))
                 if path == "/api/raw":
                     return self._send(200, RAW_RING.since(int(query.get("after", 0))))
                 if path == "/api/devices":
@@ -122,6 +125,8 @@ def make_handler(api):
                     return self._send(200, api.command(body))
                 if path == "/api/scan/start":
                     return self._send(200, api.scan_start())
+                if path == "/api/extra/remove":
+                    return self._send(200, api.remove_extra(body))
                 if path == "/api/extra":
                     return self._send(200, api.add_extra(body))
             except Exception as e:  # noqa: BLE001
