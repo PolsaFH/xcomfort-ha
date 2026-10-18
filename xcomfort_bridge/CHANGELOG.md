@@ -1,5 +1,12 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.2.2 (2026-10-18)
+
+### Rettet
+- Knapper og innganger blir funnet igjen også når SONEN endres i xSetup.
+  Home Manager har sonen i navnet (IN_Hus_BRstue1 ble IN_Stue_BRstue1), så
+  broen sammenligner nå bare første og siste del av navnet.
+
 ## 2.2.1 (2026-10-18)
 
 ### Rettet

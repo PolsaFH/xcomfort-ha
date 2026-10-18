@@ -530,6 +530,33 @@ class TestNyeNumre(unittest.TestCase):
             fake.close()
 
 
+class TestSonebytte(unittest.TestCase):
+    def test_finner_knapp_etter_sonebytte_i_xsetup(self):
+        """18.10.2026: sone Hus -> Stue ga IN_Hus_BRstue1 (231174) nytt navn
+        IN_Stue_BRstue1 og nytt nummer 230636."""
+        names = {230636: "IN_Stue_BRstue1", 230841: "M_InSt_Stue_BRstue1", 231174: "IN_Stue_BRstue4",
+                 234899: "IN_Ventilasjon_Drift", 231939: "IN_Ventilasjon_Tettfilter",
+                 232677: "IN_Ventilasjon_Overoppheting", 232304: "IN_Ute_BRMarkise1",
+                 234213: "IN_Ute_BRMarkise2", 233840: "IN_Ute_BRMarkise3"}
+        fake = FakeHM(idle_timeout=30, exists=set(names), names=names)
+        try:
+            bro, xc = load_bridge(fake)
+            bro.IDMAP.expect(231174, "IN_Hus_BRstue1")
+            scanned = {i: (n, 11) for i, n in names.items()}
+            changes = bro.IDMAP.verify(scanned)
+            self.assertEqual(bro.IDMAP.cur(231174), 230636)
+            self.assertEqual([c[3] for c in changes], [230636])
+            self.assertEqual(bro.IDMAP.expected[231174], "IN_Stue_BRstue1")
+        finally:
+            fake.close()
+
+    def test_navnenokkel(self):
+        import idmap
+        self.assertEqual(idmap.name_key("IN_Hus_BRstue1"), idmap.name_key("IN_Stue_BRstue1"))
+        self.assertNotEqual(idmap.name_key("IN_Stue_BRstue1"), idmap.name_key("M_InSt_Stue_BRstue1"))
+        self.assertEqual(idmap.name_key("IN_BRhalluvenstre"), ("IN", "BRhalluvenstre"))
+
+
 class TestNettside(unittest.TestCase):
     def test_api_svarer(self):
         import urllib.request

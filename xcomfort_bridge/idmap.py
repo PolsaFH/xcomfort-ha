@@ -34,6 +34,26 @@ BATCH = 100
 WAIT_S = 0.25
 
 
+def name_key(name):
+    """Sammenligningsnøkkel for et objektnavn. Home Manager setter SONEN inn i
+    navnet på innganger (IN_<sone>_<navn>), så et sonebytte i xSetup gjør
+    IN_Hus_BRstue1 til IN_Stue_BRstue1. Vi sammenligner derfor bare første
+    og siste del: ("IN", "BRstue1")."""
+    parts = (name or "").split("_")
+    return (parts[0], parts[-1]) if len(parts) >= 2 else (name, "")
+
+
+def _unique_by_key(pairs):
+    """{nøkkel: id} for nøkler som bare finnes én gang."""
+    seen, dup = {}, set()
+    for oid, name in pairs:
+        k = name_key(name)
+        if k in seen and seen[k] != oid:
+            dup.add(k)
+        seen.setdefault(k, oid)
+    return {k: v for k, v in seen.items() if k not in dup}
+
+
 class IdMap:
     def __init__(self, path):
         self.path = path
@@ -97,35 +117,42 @@ class IdMap:
             conn = connect()
             try:
                 now = self._ask(conn, {self.cur(k) for k in self.expected})
-                missing = {k: n for k, n in self.expected.items() if now.get(self.cur(k)) != n}
+                missing = {}
+                for k, n in self.expected.items():
+                    got = now.get(self.cur(k))
+                    if got == n:
+                        continue
+                    if got is not None and name_key(got) == name_key(n):
+                        log.info("%s heter nå %s i Home Manager (samme nummer)", n, got)
+                        self.expected[k] = got
+                        continue
+                    missing[k] = n
                 changes = []
                 if missing and scanned:
-                    by_name = {}
-                    for oid, (name, _t) in scanned.items():
-                        by_name.setdefault(name, oid)
-                    candidates = {k: by_name[n] for k, n in missing.items() if n in by_name}
+                    by_key = _unique_by_key((oid, name) for oid, (name, _t) in scanned.items())
+                    candidates = {k: by_key[name_key(n)] for k, n in missing.items() if name_key(n) in by_key}
                     if candidates:
                         check = self._ask(conn, set(candidates.values()))
                         for k, oid in candidates.items():
-                            if check.get(oid) == missing[k]:
-                                changes.append((k, missing.pop(k), self.cur(k), oid))
+                            if name_key(check.get(oid)) == name_key(missing[k]):
+                                changes.append((k, check[oid], self.cur(k), oid))
+                                del missing[k]
                 if missing:
                     lo = max(1, min(self.cur(k) for k in missing) - WINDOW)
                     hi = max(self.cur(k) for k in missing) + WINDOW
                     log.info("Leter etter %d objekt(er) med nytt nummer (nr. %d-%d) ...", len(missing), lo, hi)
                     seen = self._ask(conn, range(lo, hi + 1))
-                    by_name = {}
-                    for oid, name in seen.items():
-                        by_name.setdefault(name, oid)
+                    by_key = _unique_by_key(seen.items())
                     for k in list(missing):
-                        name = missing[k]
-                        if name in by_name:
-                            changes.append((k, name, self.cur(k), by_name[name]))
+                        oid = by_key.get(name_key(missing[k]))
+                        if oid is not None:
+                            changes.append((k, seen[oid], self.cur(k), oid))
                             del missing[k]
             finally:
                 conn.close()
             for k, name, old, new in changes:
                 self.current[k] = new
+                self.expected[k] = name
                 log.warning("%s har fått nytt nummer i Home Manager: %d -> %d (fulgt opp automatisk)",
                             name, old, new)
             for k, name in missing.items():
