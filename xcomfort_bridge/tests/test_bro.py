@@ -634,5 +634,17 @@ class TestNettside(unittest.TestCase):
             os.environ.pop("XCOMFORT_WEB_OPEN", None)
 
 
+class TestInnstillinger(unittest.TestCase):
+    def test_tom_ip_stopper_med_tydelig_feil(self):
+        fake = FakeHM()
+        try:
+            bro, _xc = load_bridge(fake, xcomfort_ip="")
+            with self.assertLogs("xcomfort.bro", level="ERROR") as cm, self.assertRaises(SystemExit):
+                bro.main()
+            self.assertIn("IP er ikke fylt inn", "\n".join(cm.output))
+        finally:
+            fake.close()
+
+
 if __name__ == "__main__":
     unittest.main()

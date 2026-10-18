@@ -7,6 +7,18 @@ Broen snakker direkte med xComfort **Home Manager** på det lokale nettverket
 (samme protokoll som eoptHome-appen bruker) og legger alt inn i Home Assistant
 automatisk via MQTT.
 
+> [!WARNING]
+> **Under utvikling.** Denne appen er ikke ferdig. Den er laget og testet på
+> ett bestemt anlegg, og du kan oppleve feil eller ting som ikke fungerer på
+> ditt. Vi jobber med å gjøre den klar og stabil for alle. Det vil komme
+> endringer, også i innstillinger og enheter, så les
+> [endringsloggen](xcomfort_bridge/CHANGELOG.md) før du oppdaterer, og ta en
+> sikkerhetskopi av Home Assistant først. Si gjerne fra om problemer under
+> *Issues*.
+>
+> **Work in progress.** This app is not finished yet and may not work on
+> your installation. Expect changes, including to settings and entities.
+
 > **English summary:** A Home Assistant app (add-on) that bridges an Eaton /
 > Sensio xComfort *Home Manager* to Home Assistant over MQTT, fully local
 > (TCP port 10023, no cloud). Lights, switches, sensors, thermostats, awnings

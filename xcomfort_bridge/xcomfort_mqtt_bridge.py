@@ -46,7 +46,7 @@ import scanner
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.3.0"
+BRIDGE_VERSION = "2.3.1"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -55,7 +55,7 @@ DEFAULT_OPTIONS = {
     "xcomfort_port": xc.CONTROLLER_PORT,
     "mqtt_host": "core-mosquitto",
     "mqtt_port": 1883,
-    "mqtt_username": "xcomfort",
+    "mqtt_username": "",
     "mqtt_password": "",
     "log_level": "info",
     "poll_interval": 20,
@@ -1905,6 +1905,11 @@ class Api:
 
 def main():
     setup_logging(OPTS["log_level"])
+    if not str(OPTS["xcomfort_ip"]).strip():
+        log.error("Home Manager IP er ikke fylt inn. Gaa til appens Konfigurasjon-fane, "
+                  "fyll inn IP-adressen til Home Manager (og MQTT-brukernavn/passord), "
+                  "lagre og start appen paa nytt.")
+        sys.exit(1)
     log.info("Starter xComfort MQTT-bro v%s (Home Manager %s:%s, MQTT %s:%s, loggnivaa %s)",
              BRIDGE_VERSION, OPTS["xcomfort_ip"], OPTS["xcomfort_port"],
              OPTS["mqtt_host"], OPTS["mqtt_port"], OPTS["log_level"])

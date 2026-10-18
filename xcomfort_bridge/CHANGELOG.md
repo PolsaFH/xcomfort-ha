@@ -1,5 +1,16 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.3.1 (2026-10-18)
+
+### Endret
+- Innstillingene er ikke lenger forhåndsutfylt med IP-adresse og
+  MQTT-brukernavn fra utviklerens eget anlegg. Nye brukere må fylle inn
+  **Home Manager IP**, **MQTT-brukernavn** og **MQTT-passord** selv.
+  Har du allerede lagret innstillingene dine, beholdes de som før.
+- Er Home Manager IP tom, stopper broen med en tydelig melding i loggen
+  om hva som må fylles inn, i stedet for å prøve å koble til ingenting.
+- Bedre forklaring av innstillingene i Konfigurasjon-fanen.
+
 ## 2.3.0 (2026-10-18)
 
 ### Ny nettside (sidepanelet «xComfort» i HA)

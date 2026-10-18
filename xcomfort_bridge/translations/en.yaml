@@ -1,7 +1,7 @@
 configuration:
   xcomfort_ip:
     name: Home Manager IP
-    description: Lokal IP-adresse til xComfort Home Manager.
+    description: "Må fylles inn. Lokal IP-adresse til xComfort Home Manager, f.eks. 192.168.1.50. Gi Home Manager fast IP i ruteren."
   xcomfort_port:
     name: Home Manager port
   mqtt_host:
@@ -10,8 +10,10 @@ configuration:
     name: MQTT-port
   mqtt_username:
     name: MQTT-brukernavn
+    description: "Må fylles inn. En Home Assistant-bruker (f.eks. en egen bruker kalt xcomfort) som broen logger inn på Mosquitto med."
   mqtt_password:
     name: MQTT-passord
+    description: Passordet til MQTT-brukeren over.
   log_level:
     name: Loggnivå
     description: "info = vanlig. debug = logger ALT som sendes til og fra Home Manager (bruk ved feilsøking)."

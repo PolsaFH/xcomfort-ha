@@ -1,5 +1,5 @@
 name: "xComfort MQTT-bro"
-version: "2.3.0"
+version: "2.3.1"
 slug: "xcomfort_bridge"
 description: "Kobler xComfort-anlegget til Home Assistant via MQTT (lokalt, uten sky)"
 arch:
@@ -20,11 +20,11 @@ ingress_port: 8099
 panel_icon: mdi:lightbulb-group
 panel_title: xComfort
 options:
-  xcomfort_ip: "192.168.50.169"
+  xcomfort_ip: ""
   xcomfort_port: 10023
   mqtt_host: "core-mosquitto"
   mqtt_port: 1883
-  mqtt_username: "xcomfort"
+  mqtt_username: ""
   mqtt_password: ""
   log_level: "info"
   poll_interval: 20

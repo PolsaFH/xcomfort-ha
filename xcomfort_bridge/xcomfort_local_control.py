@@ -71,7 +71,7 @@ import time
 # enkelt format opp i main().
 _log = logging.getLogger("xcomfort.protokoll")
 
-CONTROLLER_IP = os.environ.get("XCOMFORT_IP", "192.168.50.169")   # Home Manager sin lokale IP paa nettet ditt
+CONTROLLER_IP = os.environ.get("XCOMFORT_IP", "")   # Home Manager sin lokale IP (settes i appens innstillinger / XCOMFORT_IP)
 CONTROLLER_PORT = int(os.environ.get("XCOMFORT_PORT", "10023"))
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
