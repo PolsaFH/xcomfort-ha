@@ -46,7 +46,7 @@ import scanner
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.2.3"
+BRIDGE_VERSION = "2.2.4"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -1436,15 +1436,27 @@ def publish_switch_state(client, smux_id, on, force=False):
         publish_state(client, onoff_state_topic(smux_id), json.dumps({"state": "ON" if on else "OFF"}), force=force)
 
 
+def button_label(zone, name, oid):
+    """(sone, navn) for en knapp. Knapper lagt til fra nettsiden får sone og
+    navn fra objektnavnet i Home Manager slik det er NÅ (IN_<sone>_<navn>),
+    så IN_Stue_BRstue1 havner på enheten «Stue» som «BRstue1»."""
+    if zone == "Knapper":
+        parts = (IDMAP.expected.get(oid) or "").split("_")
+        if len(parts) >= 3 and parts[0] == "IN":
+            return parts[1], parts[-1]
+    return zone, name
+
+
 def publish_event_discovery(client):
     for zone, name, oid in BUTTONS:
+        zone2, name2 = button_label(zone, name, oid)
         _pub_disc(client, "event", f"xcomfort_in_{oid}", {
-            "name": name,
+            "name": name2,
             "unique_id": f"xcomfort_event_{oid}",
             "state_topic": event_topic(oid),
             "event_types": EVENT_TYPES,
             "device_class": "button",
-            "device": device_block(zone),
+            "device": device_block(zone2),
         })
 
 
@@ -1539,7 +1551,7 @@ def rebuild_registry():
     REG["alias"] = IDMAP.alias()
     REG["sensor_ids"] = {s for _, _, s, _ in CONTINUOUS_SENSORS}
     REG["thermo_ids"] = {s for _, _, s in xc.THERMOSTATS}
-    REG["button_ids"] = {oid: f"{zone} {name}" for zone, name, oid in BUTTONS}
+    REG["button_ids"] = {oid: " ".join(button_label(zone, name, oid)) for zone, name, oid in BUTTONS}
     REG["markise_ids"] = {s for _, _, s in xc.MARKISER}
     for zone, name, smux in xc.SWITCHES + xc.MARKISER:
         REG["names"][smux] = f"{zone} {name}"
@@ -1640,16 +1652,19 @@ def id_watch():
             last_scan = SCANNER.finished
             next_check = time.time() + 6 * 3600
             if not SCANNER.running:
+                names_before = dict(IDMAP.expected)
                 try:
                     changes = IDMAP.verify(SCANNER.objects)
                 except Exception as e:  # noqa: BLE001
                     log.warning("Klarte ikke sjekke objektnumre: %s", e)
                     next_check = time.time() + 600
                     changes = []
-                if changes:
+                if changes or IDMAP.expected != names_before:
                     ids = rebuild_registry()
                     if LINK:
                         LINK.subscribe(ids)
+                    if MQTT_STATE["client"] is not None:
+                        publish_event_discovery(MQTT_STATE["client"])
         time.sleep(30)
 
 

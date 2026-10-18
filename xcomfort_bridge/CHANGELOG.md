@@ -1,5 +1,14 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.2.4 (2026-10-18)
+
+### Endret
+- Knapper lagt til fra nettsiden havner nå på riktig rom-enhet i HA (for
+  eksempel «Stue») med kort navn («BRstue1»), i stedet for enheten
+  «Knapper» med navnet «Knapper Hus BRstue1». Navn og rom følger det
+  objektet heter i Home Manager nå, også etter endringer i xSetup.
+  unique_id er uendret.
+
 ## 2.2.3 (2026-10-18)
 
 ### Nytt

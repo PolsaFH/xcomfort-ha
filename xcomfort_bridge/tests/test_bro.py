@@ -557,6 +557,25 @@ class TestSonebytte(unittest.TestCase):
         self.assertEqual(idmap.name_key("IN_BRhalluvenstre"), ("IN", "BRhalluvenstre"))
 
 
+class TestKnappNavn(unittest.TestCase):
+    def test_knapp_far_rom_og_kort_navn(self):
+        fake = FakeHM()
+        try:
+            bro, xc = load_bridge(fake)
+            bro.BUTTONS.append(("Knapper", "Hus BRstue1", 231174))
+            bro.IDMAP.expect(231174, "IN_Stue_BRstue1")
+            client = FakeClient()
+            bro.publish_event_discovery(client)
+            cfg = json.loads(client.last("homeassistant/event/xcomfort_in_231174/config"))
+            self.assertEqual(cfg["name"], "BRstue1")
+            self.assertEqual(cfg["device"]["name"], "Stue")
+            self.assertEqual(cfg["unique_id"], "xcomfort_event_231174")
+            cfg = json.loads(client.last("homeassistant/event/xcomfort_in_232304/config"))
+            self.assertEqual(cfg["name"], "Markiseknapp 1")
+        finally:
+            fake.close()
+
+
 class TestNettside(unittest.TestCase):
     def test_api_svarer(self):
         import urllib.request
