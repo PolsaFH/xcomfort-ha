@@ -116,7 +116,7 @@ def load_bridge(fake, **options):
     """Laster broen paa nytt med gitte innstillinger og peker den mot den
     falske Home Manager-en."""
     tmp = tempfile.mkdtemp()
-    for mod in ("xcomfort_mqtt_bridge", "xcomfort_local_control", "hm_link", "scanner", "web", "idmap"):
+    for mod in ("xcomfort_mqtt_bridge", "xcomfort_local_control", "hm_link", "scanner", "web", "idmap", "usbstick"):
         sys.modules.pop(mod, None)
     import xcomfort_local_control as xc
     xc.CACHE_FILE = os.path.join(tmp, "cache.json")
@@ -129,6 +129,9 @@ def load_bridge(fake, **options):
     bro.SCANNER = bro.scanner.Scanner(os.path.join(tmp, "objekter.json"))
     bro.IDMAP.path = os.path.join(tmp, "id_map.json")
     bro.IDMAP.current = {}
+    bro.USB_MAP_FILE = os.path.join(tmp, "usb_kart.json")
+    bro.USB_MAP = {}
+    bro.STICK = None
     bro.MARKISER_CTRL = bro.MarkiseController()
     for m in bro.MARKISER_CTRL.markiser.values():
         m.position = 0.0
@@ -642,6 +645,250 @@ class TestInnstillinger(unittest.TestCase):
             with self.assertLogs("xcomfort.bro", level="ERROR") as cm, self.assertRaises(SystemExit):
                 bro.main()
             self.assertIn("IP er ikke fylt inn", "\n".join(cm.output))
+        finally:
+            fake.close()
+
+
+class TestHurtigvei(unittest.TestCase):
+    def _start_link(self, bro):
+        import hm_link
+        link = hm_link.HMLink(lambda o, n, f: None)
+        threading.Thread(target=link.run, daemon=True).start()
+        deadline = time.time() + 3
+        while time.time() < deadline and not link.connected:
+            time.sleep(0.02)
+        self.assertTrue(link.connected)
+        bro.LINK = link
+        return link
+
+    def test_kjente_lys_sendes_paa_lytte_forbindelsen(self):
+        fake = FakeHM(idle_timeout=30)
+        try:
+            bro, xc = load_bridge(fake)
+            xc.save_cache({"10": {"name": "D_A", "val_id": 110, "set_id": 210},
+                           "20": {"name": "D_B", "on_id": 301, "off_id": 302}})
+            link = self._start_link(bro)
+            before = fake.connections
+            client = FakeClient()
+            bro._process_command_batch(client, [("light", 10, b'{"state":"ON","brightness":40}'),
+                                                ("switch", 20, b"OFF")])
+            time.sleep(0.2)
+            cmds = [c for _, c in fake.commands() if not c.startswith("d_obj")]
+            self.assertEqual(cmds, ["set_value 110 40", "new_state 210 0", "new_state 302 0"])
+            self.assertEqual(fake.connections, before)  # ingen ny tilkobling
+            self.assertEqual(json.loads(client.last("xcomfort/light/10/state")), {"state": "ON", "brightness": 40})
+            link.stopping = True
+        finally:
+            fake.close()
+
+    def test_ukjent_lys_bruker_vanlig_vei(self):
+        fake = FakeHM(idle_timeout=30)
+        try:
+            bro, xc = load_bridge(fake)
+            xc.save_cache({"10": {"name": "D_A", "val_id": 110, "set_id": 210}})
+            link = self._start_link(bro)
+            self.assertIsNone(bro._fast_batch_lines([("light", 99, b'{"state":"ON"}')], xc.load_cache()))
+            link.stopping = True
+        finally:
+            fake.close()
+
+
+class FakeTransport:
+    """Falsk USB-pinne: husker det som skrives og kan kvittere som en lampe."""
+
+    def __init__(self, ack=True):
+        self.written = []
+        self.ack = ack
+        self.inbox = []
+        self.fail = False
+
+    def write(self, data):
+        if self.fail:
+            raise IOError("pinnen ble trukket ut")
+        assert len(data) == 62
+        self.written.append(bytes(data[:data[1]]))
+        if data[2] == 0x1B and self.ack:
+            serial = data[15:19]
+            self.inbox.append(bytes.fromhex("5a1a0301001221a03f00") + serial + b"\x00\x80\x00\x00\x00"
+                              + bytes(6) + b"\xa5")
+        if data[2] == 0x44:
+            self.inbox.append(b"\x5a\x18\x44CKOZ-00/13ET20250\x00\x30\x0b\xa5")
+
+    def read(self, timeout_ms):
+        if self.inbox:
+            return self.inbox.pop(0)
+        time.sleep(timeout_ms / 1000 / 10)
+        return None
+
+    def close(self):
+        pass
+
+
+class TestUsbPinne(unittest.TestCase):
+    def test_rammer_er_like_mrf(self):
+        import usbstick
+        self.assertEqual(usbstick.rf_frame(0x50, 9290836, b"", 0x12).hex(" "),
+                         "5a 17 1b 50 00 13 12 82 07 00 80 00 00 00 00 54 c4 8d 00 00 be 75 a5")
+        self.assertEqual(usbstick.level_frame(2746356, 26, 0x10).hex(" "),
+                         "5a 19 1b 5a 00 15 10 82 07 00 80 00 00 00 00 f4 e7 29 00 01 00 1a 98 2a a5")
+        self.assertEqual(usbstick.level_frame(9290836, 0, 0x12)[3], 0x51)
+
+    def test_kvittering_tolkes(self):
+        import usbstick
+        st = usbstick.UsbStick(transport_factory=lambda: None)
+        st.feed(bytes.fromhex("5a1a0301001224a03f0054c48d0000800000001717059a02fea5"))
+        self.assertTrue(st.acked_since(9290836, 0))
+        self.assertFalse(st.acked_since(6519513, 0))
+
+    def test_uten_pyusb_eller_pinne_brukes_home_manager(self):
+        import usbstick
+        st = usbstick.UsbStick(transport_factory=lambda: None)
+        self.assertFalse(st.connect())
+        self.assertIsNone(st.set_levels([(1, 50)]))
+
+    def _bridge_with_stick(self, fake, transport):
+        bro, xc = load_bridge(fake)
+        import usbstick
+        stick = usbstick.UsbStick(transport_factory=lambda: transport)
+        self.assertTrue(stick.connect())
+        threading.Thread(target=stick.run, daemon=True).start()
+        bro.STICK = stick
+        smux = xc.LIGHTS[0][2]
+        bro.USB_MAP = {smux: [2746356, 2746386]}
+        xc.save_cache({str(smux): {"name": "D_A", "val_id": 110, "set_id": 210}})
+        return bro, xc, stick, smux
+
+    def test_lys_sendes_via_pinnen_og_ikke_via_home_manager(self):
+        fake = FakeHM()
+        tr = FakeTransport()
+        try:
+            bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
+            client = FakeClient()
+            bro._process_command_batch(client, [("light", smux, b'{"state":"ON","brightness":40}')])
+            rf = [w for w in tr.written if w[2] == 0x1B]
+            self.assertEqual(len(rf), 2)
+            self.assertEqual({int.from_bytes(w[15:19], "little") for w in rf}, {2746356, 2746386})
+            self.assertTrue(all(w[3] == 0x5A and w[21] == 40 for w in rf))
+            self.assertEqual(fake.commands("set_value"), [])
+            self.assertEqual(json.loads(client.last(f"xcomfort/light/{smux}/state")),
+                             {"state": "ON", "brightness": 40})
+            time.sleep(0.3)
+            bro._check_usb_acks([(smux, 40, [2746356, 2746386])], time.time() - 1)
+            self.assertEqual(bro._pending_commands, [])
+            stick.stopping = True
+        finally:
+            fake.close()
+
+    def test_uten_kvittering_sendes_via_home_manager(self):
+        fake = FakeHM()
+        tr = FakeTransport(ack=False)
+        try:
+            bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
+            client = FakeClient()
+            t0 = time.time()
+            bro._process_command_batch(client, [("light", smux, b'{"state":"ON","brightness":40}')])
+            bro._check_usb_acks([(smux, 40, [2746356, 2746386])], t0)
+            self.assertEqual(len(bro._pending_commands), 1)
+            batch = bro._pending_commands[:]
+            bro._pending_commands.clear()
+            bro._process_command_batch(client, batch)
+            self.assertEqual([c for _, c in fake.commands("set_value")], ["set_value 110 40"])
+            stick.stopping = True
+        finally:
+            fake.close()
+
+    def test_pinne_trukket_ut_gir_home_manager(self):
+        fake = FakeHM()
+        tr = FakeTransport()
+        try:
+            bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
+            tr.fail = True
+            bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"OFF"}')])
+            self.assertFalse(stick.healthy())
+            self.assertEqual([c for _, c in fake.commands("set_value")], ["set_value 110 0"])
+            stick.stopping = True
+        finally:
+            fake.close()
+
+    def test_gamle_verdier_fra_home_manager_ignoreres_en_stund(self):
+        fake = FakeHM()
+        try:
+            bro, xc = load_bridge(fake)
+            bro.LAST_USB[5] = (60, time.time())
+            self.assertTrue(bro.usb_grace(5, 20))
+            self.assertFalse(bro.usb_grace(5, 60))
+            bro.LAST_USB[5] = (60, time.time() - 60)
+            self.assertFalse(bro.usb_grace(5, 20))
+        finally:
+            fake.close()
+
+    def test_kart_lastes_opp_og_lagres(self):
+        fake = FakeHM()
+        try:
+            bro, xc = load_bridge(fake)
+            smux = xc.LIGHTS[0][2]
+            r = bro.Api().usb_map_upload({"lys": {str(smux): {"navn": "x", "serienr": [1, 2]}, "999999999": [3]}})
+            self.assertEqual(r["lys_med_kart"], 1)
+            self.assertEqual(bro.load_usb_map(), {smux: [1, 2]})
+            self.assertEqual(bro.Api().usb()["lys_med_kart"], 1)
+        finally:
+            fake.close()
+
+
+class TestLysstyring(TestUsbPinne):
+    def test_bare_home_manager_bruker_ikke_pinnen(self):
+        fake = FakeHM()
+        tr = FakeTransport()
+        try:
+            bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
+            bro.OPTS["lysstyring"] = "home_manager"
+            bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"ON","brightness":30}')])
+            self.assertEqual([w for w in tr.written if w[2] == 0x1B], [])
+            self.assertEqual([c for _, c in fake.commands("set_value")], ["set_value 110 30"])
+            stick.stopping = True
+        finally:
+            fake.close()
+
+    def test_bare_pinne_sender_ikke_via_home_manager_uten_kvittering(self):
+        fake = FakeHM()
+        tr = FakeTransport(ack=False)
+        try:
+            bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
+            bro.OPTS["lysstyring"] = "pinne"
+            t0 = time.time()
+            bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"ON","brightness":30}')])
+            bro._check_usb_acks([(smux, 30, [2746356, 2746386])], t0, fallback=False)
+            self.assertEqual(bro._pending_commands, [])
+            self.assertEqual(fake.commands("set_value"), [])
+            self.assertEqual(bro.USB_STATS["ubekreftet"], 1)
+            stick.stopping = True
+        finally:
+            fake.close()
+
+    def test_bare_pinne_uten_pinne_styrer_ikke_lyset(self):
+        fake = FakeHM()
+        tr = FakeTransport()
+        try:
+            bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
+            bro.OPTS["lysstyring"] = "pinne"
+            tr.fail = True
+            before = bro.STATS.failed
+            bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"OFF"}')])
+            self.assertEqual(fake.commands("set_value"), [])
+            self.assertEqual(bro.STATS.failed, before + 1)
+            stick.stopping = True
+        finally:
+            fake.close()
+
+    def test_gammel_innstilling_respekteres(self):
+        fake = FakeHM()
+        try:
+            bro, xc = load_bridge(fake)
+            bro.OPTS.pop("lysstyring", None)
+            bro.OPTS["usb_pinne"] = False
+            self.assertEqual(bro.light_mode(), "home_manager")
+            bro.OPTS["lysstyring"] = "pinne"
+            self.assertEqual(bro.light_mode(), "pinne")
         finally:
             fake.close()
 

@@ -1,5 +1,57 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.6.0 (2026-10-30)
+
+### Nytt: velg hvordan lys styres
+- Ny innstilling **Lysstyring** i Konfigurasjon-fanen:
+  - **hybrid** (standard): USB-pinnen først. Mangler pinnen, eller svarer
+    ikke en dimmer innen 1,5 sekunder, sendes kommandoen via Home Manager.
+  - **pinne**: bare USB-pinnen, uten reserve. Virker ikke pinnen, eller en
+    dimmer ikke svarer, skrives det i loggen, men det sendes ikke via Home
+    Manager.
+  - **home_manager**: bare Home Manager, som før pinnen. Pinnen åpnes ikke.
+- Lys uten USB-kart går alltid via Home Manager. Brytere, termostater og
+  markiser går alltid via Home Manager.
+- Erstatter «Bruk USB-pinne» fra 2.5.0. Var den slått av, gjelder det
+  fortsatt til du velger noe annet.
+- Nettsiden viser valgt lysstyring under Verktøy → USB-pinne.
+
+## 2.5.0 (2026-10-30)
+
+### Nytt: USB-pinne for direkte radio (valgfritt, eksperimentelt)
+- Står xComfort-pinnen **CKOZ-00/13** (den samme som brukes i MRF) i
+  HA-maskinen, sender broen lyskommandoer rett ut på radio til dimmerne.
+  Lysene reagerer da med en gang, uten omveien via Home Manager.
+- Broen trenger et **USB-kart** som sier hvilke dimmere (serienumre) som
+  hører til hvert lys. Det lages på PC-en med `verktoy/lag_usb_kart.py` og
+  lastes opp under **Verktøy → USB-pinne** på nettsiden. Kartet lagres bare
+  i appen, ikke i repoet.
+- **Home Manager er alltid reserve:** Hver dimmer kvitterer på radio. Kommer
+  det ikke kvittering fra alle dimmerne i et lys innen 1,5 sekunder, sendes
+  samme kommando via Home Manager. Er pinnen ikke satt i, trekkes ut eller
+  slutter å svare, brukes Home Manager som før, og broen prøver å finne
+  pinnen igjen hvert 30. sekund.
+- Brytere, termostater og markiser går fortsatt via Home Manager.
+- Ny innstilling **Bruk USB-pinne** (på som standard). Nettsiden viser om
+  pinnen er tilkoblet, hvor mange lys som har serienumre, og hvor ofte
+  reserven via Home Manager har blitt brukt.
+- Pinnen kan ikke brukes i MRF samtidig. Flytt den til PC-en når du skal
+  programmere, og tilbake etterpå.
+
+## 2.4.0 (2026-10-30)
+
+### Raskere lys
+- Lys- og bryterkommandoer sendes nå rett på den åpne lytte-forbindelsen
+  til Home Manager. Før åpnet broen en ny forbindelse for hver kommando og
+  ventet på handshake fra Home Manager først. Det tok tid hver gang.
+- Broen venter kortere på å samle kommandoer som kommer samtidig (0,05 s i
+  stedet for 0,15 s), så enkeltkommandoer går ut raskere. Scener som
+  styrer flere lys samtidig sendes fortsatt samlet.
+- Hvis lytte-forbindelsen er nede, eller et lys er nytt og styre-objektene
+  må letes fram, brukes den gamle veien automatisk.
+- Loggen viser nå hvor lang tid det gikk fra HA ba om noe til kommandoen
+  var sendt, og hvilken vei den gikk, for eksempel «via lytte-forbindelsen».
+
 ## 2.3.1 (2026-10-18)
 
 ### Endret

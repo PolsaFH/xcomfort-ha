@@ -43,10 +43,11 @@ import paho.mqtt.client as mqtt
 import hm_link
 import idmap
 import scanner
+import usbstick
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.3.1"
+BRIDGE_VERSION = "2.5.0"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -68,6 +69,7 @@ DEFAULT_OPTIONS = {
     "markise_gjenta_bevegelse": False,
     "hurtig_status": True,
     "lysbrytere_som_lys": False,
+    "lysstyring": "hybrid",
 }
 
 OPTIONS_FILE = "/data/options.json"
@@ -646,16 +648,28 @@ def publish_diag(client):
 #
 # v2: Flere kommandoer til SAMME enhet i samme bolk -> bare den siste
 # sendes (rekkefoelgen er ellers som HA sendte dem).
+#
+# v2.4 (hurtigvei): Er lytte-forbindelsen oppe og alle styre-objektene
+# kjent, sendes bolken rett på den åpne forbindelsen. Da slipper vi å koble
+# til, vente på handshake og lese svar etterpå for hver kommando. Ellers
+# brukes den gamle veien med egen forbindelse.
 
-COMMAND_BATCH_WINDOW = 0.15
+COMMAND_BATCH_WINDOW = 0.05
+# Pause mellom set_value og new_state (Home Manager må ha fått verdien først).
+SET_TO_EXECUTE_PAUSE_S = 0.1
 
 _pending_commands = []
 _pending_lock = threading.Lock()
 _pending_event = threading.Event()
 
 
+_first_queued_at = [0.0]
+
+
 def _queue_command(kind, smux_id, payload_bytes):
     with _pending_lock:
+        if not _pending_commands:
+            _first_queued_at[0] = time.time()
         _pending_commands.append((kind, smux_id, payload_bytes))
     _pending_event.set()
 
@@ -721,11 +735,233 @@ def cached_objects(conn, smux_id, cache, finder, for_command=False):
     return info
 
 
-def _process_command_batch(client, batch):
+# ------------------------------------------------------------- USB-pinne --
+#
+# Med USB-pinnen (CKOZ-00/13) i HA-maskinen sendes lyskommandoer rett ut på
+# radio til dimmerne (se usbstick.py). Hvert lys i HA kan bestå av flere
+# dimmere; hvilke står i /data/usb_kart.json (lastes opp på nettsiden).
+# Kvitterer ikke alle dimmerne innen USB_ACK_S, sendes samme kommando via
+# Home Manager. Uten pinne eller kart brukes Home Manager som før.
+
+STICK = None
+USB_MAP_FILE = "/data/usb_kart.json" if os.path.isdir("/data") else \
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "usb_kart.json")
+USB_MAP = {}            # lys-smux -> [serienr, ...]
+USB_ACK_S = 1.5
+USB_GRACE_S = 10.0      # så lenge stoler vi på det vi sendte framfor gamle verdier fra Home Manager
+LAST_USB = {}           # lys-smux -> (prosent, tid)
+_force_hm = {}          # lys-smux -> tid; neste kommando skal via Home Manager
+USB_STATS = {"bekreftet": 0, "reserve": 0, "ubekreftet": 0}
+
+
+def load_usb_map():
+    global USB_MAP
+    try:
+        with open(USB_MAP_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        USB_MAP = {}
+        return USB_MAP
+    except Exception as e:  # noqa: BLE001
+        log.warning("Klarte ikke lese USB-kartet %s: %s", USB_MAP_FILE, e)
+        USB_MAP = {}
+        return USB_MAP
+    lights = {s for _, _, s in xc.LIGHTS}
+    USB_MAP = {int(k): [int(x) for x in v] for k, v in (data.get("lys") or {}).items()
+               if int(k) in lights and v}
+    return USB_MAP
+
+
+def save_usb_map(lys):
+    tmp = USB_MAP_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"lys": {str(k): v for k, v in lys.items()}}, f, indent=1)
+    os.replace(tmp, USB_MAP_FILE)
+    return load_usb_map()
+
+
+def usb_grace(smux_id, pct):
+    """True hvis vi nettopp har sendt et ANNET nivå via pinnen. Da er en
+    avvikende verdi fra Home Manager trolig gammel og skal ikke vises."""
+    last = LAST_USB.get(smux_id)
+    return bool(last and time.time() - last[1] < USB_GRACE_S and abs(last[0] - pct) > 2)
+
+
+LIGHT_MODES = ("hybrid", "pinne", "home_manager")
+
+
+def light_mode():
+    """Hvordan lys styres: hybrid (pinne, Home Manager som reserve), bare
+    pinne, eller bare Home Manager."""
+    m = OPTS.get("lysstyring")
+    if m in LIGHT_MODES:
+        return m
+    return "home_manager" if OPTS.get("usb_pinne") is False else "hybrid"  # gammel innstilling (2.5.0)
+
+
+def _try_usb(client, batch, t_start):
+    """Sender lys som har serienumre via pinnen. Returnerer resten av bolken
+    (det som skal via Home Manager)."""
+    mode = light_mode()
+    stick = STICK
+    if mode == "home_manager" or not USB_MAP:
+        return batch
+    now = time.time()
+    rest, lights, targets = [], [], []
+    for kind, smux_id, payload in batch:
+        serials = USB_MAP.get(smux_id) if kind == "light" else None
+        if not serials or (mode == "hybrid" and _force_hm.get(smux_id, 0) > now):
+            rest.append((kind, smux_id, payload))
+            continue
+        brightness = _parse_light_brightness(payload)
+        if brightness is None:
+            continue
+        lights.append((smux_id, brightness, serials))
+        targets += [(s, brightness) for s in serials]
+    if not lights:
+        return batch
+    t0 = stick.set_levels(targets) if stick is not None else None
+    if t0 is None:
+        if mode == "hybrid":
+            return batch  # pinnen virker ikke -- alt går via Home Manager
+        log.error("Bare pinne er valgt, men USB-pinnen virker ikke: %d lys ble IKKE styrt (%s)",
+                  len(lights), ", ".join(str(REG["names"].get(s, s)) for s, _, _ in lights))
+        STATS.add(failed=len(lights))
+        return rest
+    for smux_id, brightness, _ in lights:
+        LAST_USB[smux_id] = (brightness, t0)
+    _finish_batch(client, [(s, b, None) for s, b, _ in lights], [], [], t_start, "via USB-pinnen")
+    threading.Timer(USB_ACK_S, _check_usb_acks, args=(lights, t0, mode == "hybrid")).start()
+    return rest
+
+
+def _check_usb_acks(lights, t0, fallback=True):
+    stick = STICK
+    for smux_id, brightness, serials in lights:
+        missing = [s for s in serials if not (stick and stick.acked_since(s, t0))]
+        if not missing:
+            USB_STATS["bekreftet"] += 1
+            continue
+        names = ", ".join(str(s) for s in missing)
+        if not fallback:
+            USB_STATS["ubekreftet"] += 1
+            log.warning("Lys %s: %d av %d dimmere kvitterte ikke via USB-pinnen (%s). Bare pinne er valgt, "
+                        "så det sendes ikke via Home Manager.", REG["names"].get(smux_id, smux_id),
+                        len(missing), len(serials), names)
+            continue
+        USB_STATS["reserve"] += 1
+        log.warning("Lys %s: %d av %d dimmere kvitterte ikke via USB-pinnen (%s) -- sender via Home Manager",
+                    REG["names"].get(smux_id, smux_id), len(missing), len(serials), names)
+        _force_hm[smux_id] = time.time() + 5
+        LAST_USB.pop(smux_id, None)
+        _queue_command("light", smux_id, json.dumps(
+            {"state": "ON" if brightness else "OFF", "brightness": brightness}).encode())
+
+
+def start_usb_stick():
+    global STICK
+    mode = light_mode()
+    if mode == "home_manager":
+        log.info("Lysstyring: bare Home Manager (USB-pinnen brukes ikke)")
+        return
+    log.info("Lysstyring: %s", "bare USB-pinne" if mode == "pinne" else
+             "hybrid (USB-pinne, Home Manager som reserve)")
+    n = len(load_usb_map())
+    STICK = usbstick.UsbStick()
+    threading.Thread(target=STICK.run, daemon=True, name="usb").start()
+    if n:
+        log.info("USB-kart lastet: %d lys har serienumre", n)
+    else:
+        log.info("Ingen USB-kart ennå (last opp under Verktøy på nettsiden) -- pinnen brukes ikke til lys før det finnes")
+
+
+def _fast_batch_lines(batch, cache):
+    """Lager kommandolinjene for en bolk bare ut fra det vi allerede vet.
+    Returnerer None hvis noe mangler (da brukes den vanlige veien)."""
+    first, second = [], []
+    lights, switches, climates = [], [], []
+    for kind, smux_id, payload in batch:
+        info = cache.get(str(smux_id), {})
+        if kind == "light":
+            brightness = _parse_light_brightness(payload)
+            if brightness is None:
+                continue
+            if not (info.get("val_id") and info.get("set_id")):
+                return None
+            first.append(f"set_value {info['val_id']} {brightness}")
+            second.append(f"new_state {info['set_id']} 0")
+            lights.append((smux_id, brightness, info["set_id"]))
+        elif kind == "switch":
+            on = payload.decode("utf-8").strip().upper() == "ON"
+            if not (info.get("on_id") and info.get("off_id")):
+                return None
+            target = info["on_id"] if on else info["off_id"]
+            second.append(f"new_state {target} 0")
+            switches.append((smux_id, on, target))
+        elif kind == "climate":
+            try:
+                target = float(payload.decode("utf-8").strip())
+            except (ValueError, UnicodeDecodeError):
+                log.warning("Ugyldig temperatur-kommando for termostat %s: %r", smux_id, payload)
+                continue
+            target = max(xc.THERMOSTAT_MIN, min(xc.THERMOSTAT_MAX, target))
+            first.append(f"set_value {smux_id} {target}")
+            climates.append((smux_id, target))
+        else:
+            return None
+    return first, second, lights, switches, climates
+
+
+def _finish_batch(client, armed_lights, armed_switches, applied_climate, t_start, how):
+    n = len(armed_lights) + len(armed_switches) + len(applied_climate)
+    STATS.add(sent=n)
+    if n:
+        names = ", ".join(
+            [f"lys {s}->{b}%" for s, b, _ in armed_lights]
+            + [f"bryter {s}->{'PÅ' if o else 'AV'}" for s, o, _ in armed_switches]
+            + [f"termostat {s}->{t}°" for s, t in applied_climate])
+        log.info("Kommando-bolk (%d sendt %s, %.2fs etter at HA ba om det): %s",
+                 n, how, time.time() - t_start, names)
+    now = time.time()
+    for smux_id, brightness, _ in armed_lights:
+        publish_light_state(client, smux_id, brightness, force=True)
+        PENDING_CONFIRM[smux_id] = (brightness, now)
+    for smux_id, on, _ in armed_switches:
+        publish_switch_state(client, smux_id, on, force=True)
+    for smux_id, target in applied_climate:
+        publish_state(client, climate_temp_state_topic(smux_id), f"{target:.1f}")
+
+
+def _try_fast_batch(client, batch, cache, t_start):
+    link = LINK
+    if link is None or not link.healthy():
+        return False
+    built = _fast_batch_lines(batch, cache)
+    if built is None:
+        return False
+    first, second, lights, switches, climates = built
+    if not link.send_lines(first):
+        return False
+    if first and second:
+        time.sleep(SET_TO_EXECUTE_PAUSE_S)
+    if not link.send_lines(second):
+        log.warning("Hurtigveien feilet midt i en bolk -- sender på nytt via egen forbindelse")
+        return False
+    _finish_batch(client, lights, switches, climates, t_start, "via lytte-forbindelsen")
+    return True
+
+
+def _process_command_batch(client, batch, t_start=None):
     batch = dedupe_last_wins(batch)
     cache = xc.load_cache()
+    if t_start is None:
+        t_start = time.time()
+    batch = _try_usb(client, batch, t_start)
+    if not batch:
+        return
+    if _try_fast_batch(client, batch, cache, t_start):
+        return
     armed_lights, armed_switches, applied_climate = [], [], []
-    t_start = time.time()
 
     with conn_lock:
         try:
@@ -770,12 +1006,12 @@ def _process_command_batch(client, batch):
                     STATS.add(failed=1)
 
             if armed_lights or armed_switches:
-                time.sleep(0.1)
+                time.sleep(SET_TO_EXECUTE_PAUSE_S)
             for _s, _b, set_id in armed_lights:
                 conn.send_line(f"new_state {set_id} 0")
             for _s, _o, target_id in armed_switches:
                 conn.send_line(f"new_state {target_id} 0")
-            reply = conn.drain(wait=0.5)
+            reply = conn.drain(wait=0.2)
         except Exception as e:  # noqa: BLE001
             log.error("Kommando-bolk avbrutt: %s", e)
             STATS.contact_failed(f"kommando-bolk: {e}")
@@ -784,24 +1020,8 @@ def _process_command_batch(client, batch):
         finally:
             conn.close()
 
-    n = len(armed_lights) + len(armed_switches) + len(applied_climate)
-    STATS.add(sent=n)
-    if n:
-        names = ", ".join(
-            [f"lys {s}->{b}%" for s, b, _ in armed_lights]
-            + [f"bryter {s}->{'PÅ' if o else 'AV'}" for s, o, _ in armed_switches]
-            + [f"termostat {s}->{t}°" for s, t in applied_climate])
-        log.info("Kommando-bolk (%d sendt, %.2fs): %s", n, time.time() - t_start, names)
-        log.debug("Svar paa bolk: %s", xc.readable(reply) or "(ingen)")
-
-    now = time.time()
-    for smux_id, brightness, _ in armed_lights:
-        publish_light_state(client, smux_id, brightness, force=True)
-        PENDING_CONFIRM[smux_id] = (brightness, now)
-    for smux_id, on, _ in armed_switches:
-        publish_switch_state(client, smux_id, on, force=True)
-    for smux_id, target in applied_climate:
-        publish_state(client, climate_temp_state_topic(smux_id), f"{target:.1f}")
+    log.debug("Svar paa bolk: %s", xc.readable(reply) or "(ingen)")
+    _finish_batch(client, armed_lights, armed_switches, applied_climate, t_start, "via egen forbindelse")
 
 
 def command_batch_worker(client):
@@ -812,12 +1032,13 @@ def command_batch_worker(client):
         time.sleep(COMMAND_BATCH_WINDOW)
         with _pending_lock:
             batch = _pending_commands[:]
+            t_first = _first_queued_at[0] or time.time()
             _pending_commands.clear()
             _pending_event.clear()
         if not batch:
             continue
         try:
-            _process_command_batch(client, batch)
+            _process_command_batch(client, batch, t_first)
         except Exception:  # noqa: BLE001
             log.exception("Kommando-bolk feilet uventet")
         publish_diag(client)
@@ -1286,7 +1507,7 @@ def poll_lights(client, conn):
     found = {int(o): float(v) for o, v in SENSOR_VALUE_RE.findall(text)}
     for smux_id, info in known:
         v = found.get(info["val_id"])
-        if v is not None:
+        if v is not None and not usb_grace(smux_id, max(0, min(100, round(v)))):
             publish_light_state(client, smux_id, max(0, min(100, round(v))))
 
 
@@ -1602,9 +1823,10 @@ def on_hm_object(oid, name, fields):
         if v is not None:
             smux = REG["val_to_light"][oid]
             pct = max(0, min(100, round(v)))
-            publish_light_state(client, smux, pct)
-            note_change("lys", smux, pct, f"{REG['names'].get(smux, smux)}: {pct} %" if pct else
-                        f"{REG['names'].get(smux, smux)}: av")
+            if not usb_grace(smux, pct):
+                publish_light_state(client, smux, pct)
+                note_change("lys", smux, pct, f"{REG['names'].get(smux, smux)}: {pct} %" if pct else
+                            f"{REG['names'].get(smux, smux)}: av")
     if oid in REG["light_ids"]:
         level = _num(fields, 2)
         pending = PENDING_CONFIRM.get(oid)
@@ -1747,6 +1969,7 @@ class Api:
             "mqtt": MQTT_STATE["connected"],
             "mqtt_host": OPTS["mqtt_host"],
             "lytter_ok": bool(LINK and LINK.healthy()),
+            "usb": self.usb(),
             "siste_melding_sek": round(time.time() - LINK.last_rx) if LINK and LINK.last_rx else None,
             "sendt": snap["sent"], "feilet": snap["failed"], "siste_feil": snap["last_error"],
             "bekreftet": snap["confirmed"], "ubekreftet": snap["unconfirmed"],
@@ -1790,6 +2013,30 @@ class Api:
                         "siste": last[0] if last else None, "sek_siden": round(time.time() - last[1]) if last else None,
                         "tilstand": last[0].replace("_", " ") if last else "ingen trykk ennå"})
         return out
+
+    def usb(self):
+        info = STICK.snapshot() if STICK else {"tilkoblet": False, "navn": "", "sendt": 0, "feilet": 0,
+                                                "siste_feil": ""}
+        info.update({"aktivert": light_mode() != "home_manager", "modus": light_mode(),
+                     "ubekreftet": USB_STATS["ubekreftet"], "lys_med_kart": len(USB_MAP),
+                     "lys_totalt": len(xc.LIGHTS), "bekreftet": USB_STATS["bekreftet"],
+                     "via_reserve": USB_STATS["reserve"],
+                     "kart": [{"id": k, "navn": REG["names"].get(k, str(k)), "serienr": v}
+                              for k, v in sorted(USB_MAP.items(), key=lambda kv: REG["names"].get(kv[0], ""))]})
+        return info
+
+    def usb_map_upload(self, body):
+        lys = body.get("lys") if isinstance(body, dict) else None
+        if not isinstance(lys, dict):
+            raise ValueError("fila må ha formen {\"lys\": {\"<id>\": [serienr, ...]}}")
+        clean = {}
+        for k, v in lys.items():
+            if isinstance(v, dict):
+                v = v.get("serienr", [])
+            clean[int(k)] = [int(x) for x in v]
+        n = len(save_usb_map(clean))
+        log.info("Nytt USB-kart lagret: %d lys har serienumre", n)
+        return {"ok": True, "lys_med_kart": n}
 
     def remove_extra(self, body):
         """Fjerner en knapp som er lagt til fra nettsiden (ikke de faste)."""
@@ -1933,6 +2180,7 @@ def main():
 
     global LINK
     merge_seed_cache()
+    start_usb_stick()
     load_extras()
     ids = rebuild_registry()
     if OPTS["hurtig_status"]:

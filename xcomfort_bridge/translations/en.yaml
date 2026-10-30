@@ -45,3 +45,9 @@ configuration:
   lysbrytere_som_lys:
     name: Lysbrytere også som lys
     description: Lager i tillegg en lys-enhet for hver av-på-lysbryter (f.eks. taklamper), så de havner under Lys i HA og Google Home. De gamle bryter-enhetene beholdes uendret.
+  lysstyring:
+    name: Lysstyring
+    description: "hybrid = USB-pinnen først, Home Manager hvis pinnen mangler eller en dimmer ikke svarer (anbefalt). pinne = bare USB-pinnen, ingen reserve. home_manager = bare Home Manager, slik det var før pinnen. Lys uten USB-kart går alltid via Home Manager. Brytere, termostater og markiser går alltid via Home Manager."
+  usb_pinne:
+    name: (Gammel) Bruk USB-pinne
+    description: "Erstattet av «Lysstyring». La stå tom."

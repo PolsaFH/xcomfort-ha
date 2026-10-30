@@ -109,6 +109,8 @@ def make_handler(api):
                     return self._send(200, api.scan_info())
                 if path == "/api/cache":
                     return self._send(200, api.cache())
+                if path == "/api/usb":
+                    return self._send(200, api.usb())
             except Exception as e:  # noqa: BLE001
                 log.exception("Feil i nettsiden")
                 return self._send(500, {"feil": str(e)})
@@ -129,6 +131,8 @@ def make_handler(api):
                     return self._send(200, api.remove_extra(body))
                 if path == "/api/extra":
                     return self._send(200, api.add_extra(body))
+                if path == "/api/usb/kart":
+                    return self._send(200, api.usb_map_upload(body))
             except Exception as e:  # noqa: BLE001
                 log.exception("Feil i nettsiden")
                 return self._send(500, {"feil": str(e)})

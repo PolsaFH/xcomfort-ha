@@ -241,6 +241,15 @@ details.card[open] summary{margin-bottom:12px}
       <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="api/cache" download="xcomfort_object_cache.json">Styre-objekter</a><a class="btn" href="api/scan/all" download="hm_objekter.json">Alle objekter</a></div>
     </div>
   </div>
+  <div class="card" style="margin-top:14px" id="usbcard"><h2>USB-pinne (direkte radio)</h2>
+    <p class="muted" style="margin-top:0">Med xComfort-pinnen CKOZ-00/13 satt i HA-maskinen styres lysene rett over radio og reagerer med en gang. Uten pinne, eller hvis en dimmer ikke svarer, brukes Home Manager som før.</p>
+    <div id="usbstat" class="small"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+      <label class="btn" style="cursor:pointer">Last opp USB-kart (.json)<input type="file" id="usbfil" accept=".json,application/json" hidden></label>
+      <button class="btn" id="usbvis">Vis kartet</button>
+    </div>
+    <div id="usbkart" style="margin-top:10px" hidden></div>
+  </div>
   <div id="kand" style="margin-top:14px"></div>
   <div class="card" style="margin-top:14px"><h2>Finn et objekt i Home Manager</h2>
     <input id="objsok" type="search" placeholder="Navn eller nummer, f.eks. «stue» eller «BR» …" style="width:100%;max-width:420px">
@@ -412,7 +421,19 @@ async function loadRaw(){if(rawPaused||!$("#rawdet").open)return;const n=await a
   const q=($("#rawsok").value||"").toLowerCase(),box=$("#rawbox"),atB=box.scrollTop+box.clientHeight>=box.scrollHeight-30;
   box.insertAdjacentHTML("beforeend",n.filter(l=>!q||l.t.toLowerCase().includes(q)).map(l=>esc(l.t)+"\n").join(""));
   if(box.textContent.length>300000)box.textContent=box.textContent.slice(-200000);if(atB)box.scrollTop=box.scrollHeight}
+async function loadUsb(){
+  const u=await api("api/usb");
+  const modus={hybrid:"Hybrid: USB-pinnen først, Home Manager som reserve",pinne:"Bare USB-pinne (ingen reserve)",home_manager:"Bare Home Manager"}[u.modus]||u.modus;
+  const st=!u.aktivert?`<span class="pill" style="margin:0">Bare Home Manager er valgt i innstillingene</span>`
+    :u.tilkoblet?`<span class="pill ok" style="margin:0"><span class="d"></span>Pinnen er tilkoblet${u.navn?" ("+esc(u.navn)+")":""}</span>`
+    :`<span class="pill warn" style="margin:0"><span class="d"></span>Ingen pinne funnet, bruker Home Manager</span>`;
+  $("#usbstat").innerHTML=`${st}<div style="margin-top:8px"><b>Lysstyring:</b> ${esc(modus)} <span class="muted">(endres under appens Konfigurasjon)</span></div><div style="margin-top:4px">${u.lys_med_kart} av ${u.lys_totalt} lys har serienumre i kartet · ${u.sendt} radiomeldinger sendt · ${u.bekreftet} bekreftet · ${u.modus==="pinne"?`${u.ubekreftet} ikke bekreftet`:`${u.via_reserve} sendt på nytt via Home Manager`}${u.siste_feil?` · <span style="color:var(--err)">Siste feil: ${esc(u.siste_feil)}</span>`:""}</div>`;
+  $("#usbkart").innerHTML=u.kart.length?`<table class="small" style="width:100%"><tr><th style="text-align:left">Lys</th><th style="text-align:left">Serienumre (dimmere)</th></tr>${u.kart.map(k=>`<tr><td>${esc(k.navn)}</td><td>${k.serienr.join(", ")}</td></tr>`).join("")}</table>`:`<div class="muted">Ikke noe kart lastet opp ennå.</div>`;
+}
+$("#usbvis").onclick=()=>{const k=$("#usbkart");k.hidden=!k.hidden};
+$("#usbfil").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const r=await post("api/usb/kart",JSON.parse(await f.text()));toast(`Kart lagret: ${r.lys_med_kart} lys`);loadUsb()}catch(err){toast("Kunne ikke lese fila: "+err.message,true)}e.target.value=""};
 async function loadTools(){
+  loadUsb().catch(()=>{});
   const s=scanInfo=await api("api/scan"),st=s.status,c=s.kandidater;
   $("#scanstat").innerHTML=st.running?`<div class="progress"><div style="width:${Math.round(st.progress*100)}%"></div></div><div class="small muted">${Math.round(st.progress*100)} % · ${st.found} objekter funnet så langt. Du kan lukke siden imens.</div>`
     :`<button class="btn pri" id="scan">${ic("wave")}Start søk</button> <span class="small muted" style="margin-left:6px">${st.finished?`Sist kjørt ${esc(st.finished)} · ${st.objects} objekter`:"Ikke kjørt ennå"}${st.error?` · <span style="color:var(--err)">Feil: ${esc(st.error)}</span>`:""}</span>`;

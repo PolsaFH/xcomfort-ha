@@ -90,6 +90,23 @@ class HMLink:
                 self.subscribed_at[oid] = now
             time.sleep(0.2)
 
+    def send_lines(self, lines):
+        """Sender kommandoer over den ÅPNE lytte-forbindelsen (ingen ny
+        tilkobling og handshake). Returnerer False hvis forbindelsen ikke er
+        oppe, så den som kaller kan bruke en vanlig forbindelse i stedet."""
+        if not lines:
+            return True
+        data = b"".join(xc.STX + line.encode("ascii") + xc.ETX for line in lines)
+        with self.lock:
+            if not self.conn or not self.connected:
+                return False
+            try:
+                self.conn.sock.sendall(data)
+            except OSError as e:
+                log.warning("Klarte ikke sende på lytte-forbindelsen: %s", e)
+                return False
+        return True
+
     def recently_subscribed(self, oid, seconds=5.0):
         """True rett etter at vi abonnerte (svaret er da startverdien, ikke
         en ny hendelse)."""

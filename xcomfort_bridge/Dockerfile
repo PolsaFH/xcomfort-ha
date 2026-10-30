@@ -4,7 +4,10 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir paho-mqtt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libusb-1.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir paho-mqtt pyusb
 
 COPY *.py seed_cache.json /app/
 COPY web /app/web

@@ -39,6 +39,7 @@ automatisk via MQTT.
 - [Veggknapper og automasjoner](#veggknapper-og-automasjoner)
 - [Når du endrer noe i xSetup eller MRF](#når-du-endrer-noe-i-xsetup-eller-mrf)
 - [Markiser](#markiser)
+- [USB-pinne (valgfritt)](#usb-pinne-valgfritt-eksperimentelt)
 - [Tilpasse til ditt eget anlegg](#tilpasse-til-ditt-eget-anlegg)
 - [Feilsøking](#feilsøking)
 - [Sikkerhet](#sikkerhet)
@@ -149,6 +150,7 @@ er nytt. Ta gjerne en sikkerhetskopi av HA før store oppdateringer.
 | Loggnivå | `info` | `debug` logger all trafikk til og fra Home Manager. Bruk ved feilsøking |
 | Avlesningsintervall | `20` sek | Hvor ofte alt leses av som en ekstra sikkerhet |
 | Hurtig status | på | Holder en forbindelse åpen og får endringer på under 1 sek. Kreves for knapper |
+| Lysstyring | `hybrid` | `hybrid`, `pinne` eller `home_manager`, se [USB-pinne](#usb-pinne-valgfritt-eksperimentelt) |
 | Lysbrytere også som lys | av | Lager en ekstra `light` for hver av/på-bryter, så de havner under Lys i HA og Google Home |
 | Markise-posisjon | på | Regner ut omtrentlig posisjon (0-100 %) fra kjøretid |
 | Kjøretid per markise | | Sekunder fra helt inne til helt ute. Mål med stoppeklokke |
@@ -287,6 +289,35 @@ det. Sjekk alltid i xSetup før du velger datapunktnummer i MRF.
 
 ---
 
+## USB-pinne (valgfritt, eksperimentelt)
+
+Har du xComfort-pinnen **CKOZ-00/13** (USB-pinnen som brukes til MRF), kan
+broen sende lyskommandoer rett ut på radio i stedet for via Home Manager.
+Lysene reagerer da med en gang. Home Manager brukes fortsatt som reserve og
+for alt annet.
+
+1. Sett pinnen i maskinen som kjører Home Assistant, helst sentralt i huset.
+2. Lag USB-kartet på PC-en med `lag_usb_kart.py`. Det trenger MRF-eksporten
+   og en xSetup-backup, og lager `usb_kart.json` med hvilke dimmere
+   (serienumre) som hører til hvert lys.
+3. På nettsiden: **Verktøy → USB-pinne → Last opp USB-kart**.
+4. Sjekk at det står «Pinnen er tilkoblet» og at lysene har serienumre.
+
+Innstillingen **Lysstyring** bestemmer hva som brukes:
+
+| Valg | Betyr |
+|---|---|
+| `hybrid` (standard) | Pinnen først. Svarer ikke en dimmer innen 1,5 sekunder, eller pinnen mangler, brukes Home Manager |
+| `pinne` | Bare pinnen, uten reserve |
+| `home_manager` | Bare Home Manager, slik det var før pinnen |
+
+Pinnen kan ikke brukes i MRF og av appen samtidig.
+
+Protokollen mellom pinnen og dimmerne er funnet ved å ta opp trafikken fra
+MRF. Den er ikke dokumentert av Eaton. Se `usbstick.py`.
+
+---
+
 ## Tilpasse til ditt eget anlegg
 
 Denne broen er laget og testet for **ett bestemt anlegg**. Protokollen er
@@ -351,6 +382,7 @@ xcomfort-ha/
     ├── hm_link.py                   Lytte-forbindelsen (hurtig status)
     ├── idmap.py                     Følger objekter som får nytt nummer
     ├── scanner.py                   Søk etter alle objekter i Home Manager
+    ├── usbstick.py                  Direkte radio via USB-pinnen CKOZ-00/13
     ├── web.py, web/index.html       Nettsiden i sidepanelet
     ├── seed_cache.json              Kjente objekt-numre for raskere første start
     ├── translations/                Tekster til innstillingene
