@@ -22,6 +22,7 @@ Pinnen er valgfri. Finnes den ikke, eller slutter den å virke, bruker broen
 Home Manager som før.
 """
 
+import collections
 import logging
 import random
 import threading
@@ -58,12 +59,23 @@ def rf_frame(cmd, serial, extra=b"", seq=0x10):
     return bytes([0x5A, len(inner) + 2]) + inner
 
 
+def percent_to_raw(percent):
+    """Dimmerne bruker 0-255 på radio (MRF sendte 0x80 for halv styrke, og
+    «på» rapporteres som 0xFF). HA og Home Manager bruker 0-100 %."""
+    percent = max(0, min(100, float(percent)))
+    return 0 if percent <= 0 else max(1, min(255, int(round(percent * 255 / 100))))
+
+
+def raw_to_percent(raw):
+    return int(round(raw * 100 / 255))
+
+
 def level_frame(serial, percent, seq):
-    """Ramme som setter en lampe til `percent` (0 = av)."""
-    percent = max(0, min(100, int(round(percent))))
-    if percent == 0:
+    """Ramme som setter en lampe til `percent` (0-100, 0 = av)."""
+    raw = percent_to_raw(percent)
+    if raw == 0:
         return rf_frame(CMD_OFF, serial, b"", seq)
-    return rf_frame(CMD_LEVEL, serial, bytes([1, 0, percent]), seq)
+    return rf_frame(CMD_LEVEL, serial, bytes([1, 0, raw]), seq)
 
 
 def parse_radio(frame):
@@ -149,6 +161,12 @@ class UsbStick:
         self.failed = 0
         self.last_error = ""
         self._logged_missing = False
+        self.rx_frames = 0
+        self.rx_radio = 0
+        self.rx_acks = 0
+        self.recent = collections.deque(maxlen=20)   # siste rammer fra pinnen (for feilsøking)
+        self.connected_at = 0.0
+        self._warned_deaf = False
 
     # -- tilkobling --
     def connect(self):
@@ -182,6 +200,8 @@ class UsbStick:
         with self.lock:
             self.transport = t
             self.ok = True
+            self.connected_at = time.time()
+            self._warned_deaf = False
         self._logged_missing = False
         log.info("USB-pinne klar (%s). Lys styres direkte over radio, Home Manager er reserve.",
                  self.name or "CKOZ-00/13")
@@ -200,16 +220,31 @@ class UsbStick:
                 continue
             if data:
                 self.feed(data)
+            elif (not self._warned_deaf and self.rx_radio == 0 and self.connected_at
+                  and time.time() - self.connected_at > 120):
+                self._warned_deaf = True
+                log.warning("USB-pinnen har ikke hørt noen radiomeldinger på 2 minutter. Kommandoer kan "
+                            "sendes, men kvitteringer kommer ikke fram -- Home Manager brukes til å bekrefte.")
 
     def feed(self, data):
-        if not data or data[0] != 0x5A or len(data) < 3:
+        if not data:
+            return
+        self.rx_frames += 1
+        self.recent.append((time.strftime("%H:%M:%S"), bytes(data[:64]).rstrip(b"\x00").hex(" ")))
+        if data[0] != 0x5A and len(data) > 1 and data[1] == 0x5A:
+            data = data[1:]  # rapport-ID foran
+        if data[0] != 0x5A or len(data) < 3:
             return
         frame = data[:data[1]]
         info = parse_radio(frame)
         if not info:
             return
+        self.rx_radio += 1
+        if self.rx_radio <= 3:
+            log.info("USB-pinnen hører radio: %s", frame.hex(" "))
         _kind, src, dst = info
         if dst == STICK_ADDR:
+            self.rx_acks += 1
             self.last_ack[src] = time.time()
         if self.on_radio:
             try:
@@ -267,4 +302,6 @@ class UsbStick:
 
     def snapshot(self):
         return {"tilkoblet": self.healthy(), "navn": self.name, "sendt": self.sent,
-                "feilet": self.failed, "siste_feil": self.last_error}
+                "feilet": self.failed, "siste_feil": self.last_error,
+                "mottatt": self.rx_frames, "radio_mottatt": self.rx_radio, "kvitteringer": self.rx_acks,
+                "siste_rammer": list(self.recent)[-10:]}

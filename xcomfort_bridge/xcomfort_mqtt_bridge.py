@@ -47,7 +47,7 @@ import usbstick
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.5.0"
+BRIDGE_VERSION = "2.6.1"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -711,6 +711,9 @@ def publish_light_state(client, smux_id, brightness, force=False):
 # Lys vi har sendt kommando til, og venter paa at lampa selv bekrefter
 # (via D_-objektet paa lytte-forbindelsen): smux_id -> (maal %, sendetid)
 PENDING_CONFIRM = {}
+# Når hvert lys sist fikk en kommando (uansett vei), så en gammel
+# pinne-kommando aldri sendes på nytt etter at en nyere er gitt.
+LAST_CMD_AT = {}
 
 
 _discovery_retry_after = {}
@@ -747,11 +750,11 @@ STICK = None
 USB_MAP_FILE = "/data/usb_kart.json" if os.path.isdir("/data") else \
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "usb_kart.json")
 USB_MAP = {}            # lys-smux -> [serienr, ...]
-USB_ACK_S = 1.5
+USB_ACK_S = 3.0        # pinnens kvittering ELLER status fra lampa via Home Manager må komme innen dette
 USB_GRACE_S = 10.0      # så lenge stoler vi på det vi sendte framfor gamle verdier fra Home Manager
 LAST_USB = {}           # lys-smux -> (prosent, tid)
 _force_hm = {}          # lys-smux -> tid; neste kommando skal via Home Manager
-USB_STATS = {"bekreftet": 0, "reserve": 0, "ubekreftet": 0}
+USB_STATS = {"bekreftet": 0, "bekreftet_hm": 0, "reserve": 0, "ubekreftet": 0}
 
 
 def load_usb_map():
@@ -838,9 +841,16 @@ def _try_usb(client, batch, t_start):
 def _check_usb_acks(lights, t0, fallback=True):
     stick = STICK
     for smux_id, brightness, serials in lights:
+        if LAST_CMD_AT.get(smux_id, 0) > t0 + 0.5:
+            continue  # en nyere kommando er gitt siden -- denne er utdatert
         missing = [s for s in serials if not (stick and stick.acked_since(s, t0))]
         if not missing:
             USB_STATS["bekreftet"] += 1
+            continue
+        pending = PENDING_CONFIRM.get(smux_id)
+        if pending is None or pending[1] < t0 - 0.5:
+            # Lampa har allerede meldt riktig nivå til Home Manager (se on_hm_object)
+            USB_STATS["bekreftet_hm"] += 1
             continue
         names = ", ".join(str(s) for s in missing)
         if not fallback:
@@ -926,6 +936,7 @@ def _finish_batch(client, armed_lights, armed_switches, applied_climate, t_start
     for smux_id, brightness, _ in armed_lights:
         publish_light_state(client, smux_id, brightness, force=True)
         PENDING_CONFIRM[smux_id] = (brightness, now)
+        LAST_CMD_AT[smux_id] = now
     for smux_id, on, _ in armed_switches:
         publish_switch_state(client, smux_id, on, force=True)
     for smux_id, target in applied_climate:
@@ -2018,7 +2029,8 @@ class Api:
         info = STICK.snapshot() if STICK else {"tilkoblet": False, "navn": "", "sendt": 0, "feilet": 0,
                                                 "siste_feil": ""}
         info.update({"aktivert": light_mode() != "home_manager", "modus": light_mode(),
-                     "ubekreftet": USB_STATS["ubekreftet"], "lys_med_kart": len(USB_MAP),
+                     "ubekreftet": USB_STATS["ubekreftet"], "bekreftet_hm": USB_STATS["bekreftet_hm"],
+                     "lys_med_kart": len(USB_MAP),
                      "lys_totalt": len(xc.LIGHTS), "bekreftet": USB_STATS["bekreftet"],
                      "via_reserve": USB_STATS["reserve"],
                      "kart": [{"id": k, "navn": REG["names"].get(k, str(k)), "serienr": v}

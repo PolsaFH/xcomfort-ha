@@ -729,7 +729,7 @@ class TestUsbPinne(unittest.TestCase):
         import usbstick
         self.assertEqual(usbstick.rf_frame(0x50, 9290836, b"", 0x12).hex(" "),
                          "5a 17 1b 50 00 13 12 82 07 00 80 00 00 00 00 54 c4 8d 00 00 be 75 a5")
-        self.assertEqual(usbstick.level_frame(2746356, 26, 0x10).hex(" "),
+        self.assertEqual(usbstick.level_frame(2746356, 10.2, 0x10).hex(" "),
                          "5a 19 1b 5a 00 15 10 82 07 00 80 00 00 00 00 f4 e7 29 00 01 00 1a 98 2a a5")
         self.assertEqual(usbstick.level_frame(9290836, 0, 0x12)[3], 0x51)
 
@@ -768,7 +768,7 @@ class TestUsbPinne(unittest.TestCase):
             rf = [w for w in tr.written if w[2] == 0x1B]
             self.assertEqual(len(rf), 2)
             self.assertEqual({int.from_bytes(w[15:19], "little") for w in rf}, {2746356, 2746386})
-            self.assertTrue(all(w[3] == 0x5A and w[21] == 40 for w in rf))
+            self.assertTrue(all(w[3] == 0x5A and w[21] == 102 for w in rf))  # 40 % = 102 av 255
             self.assertEqual(fake.commands("set_value"), [])
             self.assertEqual(json.loads(client.last(f"xcomfort/light/{smux}/state")),
                              {"state": "ON", "brightness": 40})
@@ -891,6 +891,54 @@ class TestLysstyring(TestUsbPinne):
             self.assertEqual(bro.light_mode(), "pinne")
         finally:
             fake.close()
+
+
+class TestUsbSkala(unittest.TestCase):
+    def test_prosent_til_radio(self):
+        import usbstick
+        self.assertEqual(usbstick.percent_to_raw(100), 255)
+        self.assertEqual(usbstick.percent_to_raw(50), 128)   # som MRF sendte (0x80)
+        self.assertEqual(usbstick.percent_to_raw(1), 3)
+        self.assertEqual(usbstick.percent_to_raw(0), 0)
+        self.assertEqual(usbstick.raw_to_percent(255), 100)
+
+
+class TestUsbBekreftHM(TestUsbPinne):
+    def test_status_fra_home_manager_godtas_som_bekreftelse(self):
+        fake = FakeHM()
+        tr = FakeTransport(ack=False)
+        try:
+            bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
+            t0 = time.time()
+            bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"ON","brightness":40}')])
+            bro.PENDING_CONFIRM.pop(smux, None)   # lampa har meldt 40 % til Home Manager
+            bro._check_usb_acks([(smux, 40, [2746356, 2746386])], t0)
+            self.assertEqual(bro._pending_commands, [])
+            self.assertEqual(bro.USB_STATS["bekreftet_hm"], 1)
+            stick.stopping = True
+        finally:
+            fake.close()
+
+    def test_utdatert_kommando_sendes_ikke_paa_nytt(self):
+        fake = FakeHM()
+        tr = FakeTransport(ack=False)
+        try:
+            bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
+            t0 = time.time()
+            bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"ON","brightness":40}')])
+            bro.LAST_CMD_AT[smux] = t0 + 5   # en nyere kommando er gitt
+            bro._check_usb_acks([(smux, 40, [2746356, 2746386])], t0)
+            self.assertEqual(bro._pending_commands, [])
+            stick.stopping = True
+        finally:
+            fake.close()
+
+    def test_diagnose_teller_mottatte_rammer(self):
+        import usbstick
+        st = usbstick.UsbStick(transport_factory=lambda: None)
+        st.feed(bytes.fromhex("5a1a0301001224a03f0054c48d0000800000001717059a02fea5"))
+        snap = st.snapshot()
+        self.assertEqual((snap["mottatt"], snap["radio_mottatt"], snap["kvitteringer"]), (1, 1, 1))
 
 
 if __name__ == "__main__":

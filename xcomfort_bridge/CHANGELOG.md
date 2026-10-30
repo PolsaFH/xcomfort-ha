@@ -1,5 +1,24 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.6.1 (2026-10-30)
+
+### Rettet (USB-pinne)
+- **Feil lysstyrke via pinnen.** Dimmerne bruker 0–255 på radio, ikke
+  0–100. 40 % ble derfor sendt som omtrent 16 %. Nå regnes prosent om
+  riktig, så pinnen og Home Manager gir samme lysstyrke.
+- **«0 bekreftet» og alt sendt på nytt via Home Manager.** Pinnen i
+  HA-maskinen får ikke med seg kvitteringene fra dimmerne. Nå godtas også
+  lampas egen statusmelding til Home Manager som bekreftelse, og fristen er
+  3 sekunder. Bare lys som verken kvitterer eller melder status sendes på
+  nytt via Home Manager.
+- En gammel kommando sendes aldri på nytt hvis en nyere kommando er gitt i
+  mellomtiden.
+
+### Nytt
+- Feilsøking under Verktøy → USB-pinne: hvor mange rammer, radiomeldinger
+  og kvitteringer pinnen har mottatt, og de siste rammene. Hører pinnen
+  ingenting på radio på 2 minutter, står det i loggen.
+
 ## 2.6.0 (2026-10-30)
 
 ### Nytt: velg hvordan lys styres
