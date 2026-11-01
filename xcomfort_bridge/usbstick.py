@@ -34,7 +34,9 @@ VID, PID = 0x188A, 0x1102
 PACKET = 62
 STICK_ADDR = 128               # pinnens egen adresse på radio
 RETRY_OPEN_S = 30.0
-FRAME_GAP_S = 0.06             # pause mellom radiomeldinger til flere lamper
+FRAME_GAP_S = 0.06             # minste pause mellom radiomeldinger
+ACK_WAIT_S = 0.35              # så lenge vi venter på kvittering før neste dimmer
+ACK_BUDGET_S = 2.5             # maks total ventetid per bolk (resten sendes uten å vente)
 
 INIT = ["5a 04 0b a5", "5a 05 1a 00 a5", "5a 04 44 a5", "5a 04 42 a5",
         "5a 05 33 01 a5", "5a 05 1a 01 a5", "5a 06 34 ff ff a5", "5a 04 31 a5", "5a 04 36 a5"]
@@ -180,6 +182,8 @@ class UsbStick:
         self.connected_at = 0.0
         self._warned_deaf = False
         self._read_errors = 0
+        self._ack_cv = threading.Condition()
+        self.retries = 0
 
     # -- tilkobling --
     def connect(self):
@@ -268,7 +272,9 @@ class UsbStick:
         _kind, src, dst = info
         if dst == STICK_ADDR:
             self.rx_acks += 1
-            self.last_ack[src] = time.time()
+            with self._ack_cv:
+                self.last_ack[src] = time.time()
+                self._ack_cv.notify_all()
         if self.on_radio:
             try:
                 self.on_radio(frame, info)
@@ -297,25 +303,44 @@ class UsbStick:
         self.seq = 0x10 + ((self.seq - 0x10 + 1) % 16)
         return s
 
+    def _wait_ack(self, serial, since, timeout):
+        with self._ack_cv:
+            return self._ack_cv.wait_for(lambda: self.acked_since(serial, since), timeout)
+
     def set_levels(self, targets):
-        """Sender [(serienr, prosent), ...]. Returnerer tidspunktet sendingen
-        startet, eller None hvis pinnen ikke virker (da skal Home Manager
-        brukes)."""
+        """Sender [(serienr, prosent), ...] én og én. Etter hver melding venter
+        vi kort på kvitteringen fra dimmeren før neste sendes, og prøver én
+        gang til hvis den ikke kom. Det gir færre kollisjoner på radio enn å
+        sende alt på en gang (pinnen kan ikke høre mens den sender).
+
+        Returnerer (t0, {serienr som kvitterte}) eller None hvis pinnen ikke
+        virker (da skal Home Manager brukes)."""
         if not self.healthy():
             return None
         t0 = time.time()
+        acked = set()
+        budget_end = t0 + ACK_BUDGET_S
         with self.lock:
             try:
                 for i, (serial, pct) in enumerate(targets):
-                    if i:
-                        time.sleep(FRAME_GAP_S)
-                    self.transport.write(self._pad(level_frame(serial, pct, self._next_seq())))
-                    self.sent += 1
+                    for attempt in (1, 2):
+                        sent_at = time.time()
+                        self.transport.write(self._pad(level_frame(serial, pct, self._next_seq())))
+                        self.sent += 1
+                        wait = min(ACK_WAIT_S, budget_end - time.time())
+                        if wait > 0 and self._wait_ack(serial, sent_at, wait):
+                            acked.add(int(serial))
+                            break
+                        if attempt == 1 and time.time() < budget_end:
+                            self.retries += 1
+                            continue
+                        break
+                    time.sleep(FRAME_GAP_S)
             except Exception as e:  # noqa: BLE001
                 self.failed += 1
                 broken = str(e)
             else:
-                return t0
+                return t0, acked
         self._broken(f"skrivefeil: {broken}")
         return None
 
@@ -326,5 +351,5 @@ class UsbStick:
     def snapshot(self):
         return {"tilkoblet": self.healthy(), "navn": self.name, "sendt": self.sent,
                 "feilet": self.failed, "siste_feil": self.last_error,
-                "mottatt": self.rx_frames, "radio_mottatt": self.rx_radio, "kvitteringer": self.rx_acks,
+                "omsendt": self.retries, "mottatt": self.rx_frames, "radio_mottatt": self.rx_radio, "kvitteringer": self.rx_acks,
                 "siste_rammer": list(self.recent)[-10:]}

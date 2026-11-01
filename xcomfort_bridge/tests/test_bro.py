@@ -787,7 +787,7 @@ class TestUsbPinne(unittest.TestCase):
             client = FakeClient()
             t0 = time.time()
             bro._process_command_batch(client, [("light", smux, b'{"state":"ON","brightness":40}')])
-            bro._check_usb_acks([(smux, 40, [2746356, 2746386])], t0)
+            bro._check_usb_acks([(smux, 40, [2746356, 2746386], bro.LAST_CMD_AT[smux])], t0)
             self.assertEqual(len(bro._pending_commands), 1)
             batch = bro._pending_commands[:]
             bro._pending_commands.clear()
@@ -857,7 +857,7 @@ class TestLysstyring(TestUsbPinne):
             bro.OPTS["lysstyring"] = "pinne"
             t0 = time.time()
             bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"ON","brightness":30}')])
-            bro._check_usb_acks([(smux, 30, [2746356, 2746386])], t0, fallback=False)
+            bro._check_usb_acks([(smux, 30, [2746356, 2746386], bro.LAST_CMD_AT[smux])], t0, fallback=False)
             self.assertEqual(bro._pending_commands, [])
             self.assertEqual(fake.commands("set_value"), [])
             self.assertEqual(bro.USB_STATS["ubekreftet"], 1)
@@ -912,7 +912,7 @@ class TestUsbBekreftHM(TestUsbPinne):
             t0 = time.time()
             bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"ON","brightness":40}')])
             bro.PENDING_CONFIRM.pop(smux, None)   # lampa har meldt 40 % til Home Manager
-            bro._check_usb_acks([(smux, 40, [2746356, 2746386])], t0)
+            bro._check_usb_acks([(smux, 40, [2746356, 2746386], bro.LAST_CMD_AT[smux])], t0)
             self.assertEqual(bro._pending_commands, [])
             self.assertEqual(bro.USB_STATS["bekreftet_hm"], 1)
             stick.stopping = True
@@ -984,6 +984,45 @@ class TestUsbLesing(unittest.TestCase):
         time.sleep(0.3)
         self.assertTrue(st.acked_since(9290836, 0))
         st.stopping = True
+
+
+class TestUsbOmsending(unittest.TestCase):
+    def test_proever_igjen_naar_kvittering_mangler(self):
+        import usbstick
+
+        class T(FakeTransport):
+            def __init__(self):
+                super().__init__(ack=True)
+                self.skip = 1   # første melding blir ikke kvittert
+
+            def write(self, data):
+                if data[2] == 0x1B and self.skip:
+                    self.skip -= 1
+                    self.written.append(bytes(data[:data[1]]))
+                    return
+                super().write(data)
+
+        tr = T()
+        st = usbstick.UsbStick(transport_factory=lambda: tr)
+        self.assertTrue(st.connect())
+        threading.Thread(target=st.run, daemon=True).start()
+        t0, acked = st.set_levels([(9290836, 50)])
+        self.assertEqual(acked, {9290836})
+        self.assertEqual(st.retries, 1)
+        self.assertEqual(len([w for w in tr.written if w[2] == 0x1B]), 2)
+        st.stopping = True
+
+    def test_radiologg_viser_home_manager_til_dimmer(self):
+        fake = FakeHM()
+        try:
+            bro, xc = load_bridge(fake)
+            smux = xc.LIGHTS[0][2]
+            bro.save_usb_map({smux: [9290836]})
+            frame = bytes.fromhex("5a2603530000001e3402071fd97a63000054c48d00d97a63000000000000000000007e3e97e2fcfea5")
+            bro._on_usb_radio(frame, (0x53, 6519513, 9290836))
+            self.assertEqual(bro.RADIO_LOG[-1]["retning"], "til dimmer")
+        finally:
+            fake.close()
 
 
 if __name__ == "__main__":

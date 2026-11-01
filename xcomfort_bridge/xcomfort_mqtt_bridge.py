@@ -47,7 +47,7 @@ import usbstick
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.6.2"
+BRIDGE_VERSION = "2.7.0"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -714,6 +714,7 @@ PENDING_CONFIRM = {}
 # Når hvert lys sist fikk en kommando (uansett vei), så en gammel
 # pinne-kommando aldri sendes på nytt etter at en nyere er gitt.
 LAST_CMD_AT = {}
+LAST_CMD_PCT = {}       # lys-smux -> (prosent, hvilken vei) for siste kommando
 
 
 _discovery_retry_after = {}
@@ -757,6 +758,30 @@ _force_hm = {}          # lys-smux -> tid; neste kommando skal via Home Manager
 USB_STATS = {"bekreftet": 0, "bekreftet_hm": 0, "reserve": 0, "ubekreftet": 0}
 
 
+SERIAL_TO_LIGHT = {}    # dimmer-serienr -> lys-smux
+RADIO_LOG = collections.deque(maxlen=40)   # radiomeldinger til/fra våre dimmere (feilsøking)
+
+
+def _on_usb_radio(frame, info):
+    """Alt pinnen hører. Tar vare på meldinger til og fra dimmerne i kartet,
+    så man kan se hva Home Manager sender (f.eks. hvilken verdi den bruker
+    for en gitt prosent) og hva dimmerne melder tilbake."""
+    _kind, src, dst = info
+    if src == usbstick.STICK_ADDR:
+        return
+    if dst in SERIAL_TO_LIGHT:
+        smux, retning = SERIAL_TO_LIGHT[dst], "til dimmer"
+    elif src in SERIAL_TO_LIGHT and dst != usbstick.STICK_ADDR:
+        smux, retning = SERIAL_TO_LIGHT[src], "fra dimmer"
+    else:
+        return
+    pct, how = LAST_CMD_PCT.get(smux, (None, ""))
+    RADIO_LOG.append({"tid": time.strftime("%H:%M:%S"), "lys": REG["names"].get(smux, str(smux)),
+                      "retning": retning, "fra": src, "til": dst,
+                      "siste_kommando": f"{pct} % {how}".strip() if pct is not None else "",
+                      "ramme": frame.hex(" ")})
+
+
 def load_usb_map():
     global USB_MAP
     try:
@@ -772,6 +797,8 @@ def load_usb_map():
     lights = {s for _, _, s in xc.LIGHTS}
     USB_MAP = {int(k): [int(x) for x in v] for k, v in (data.get("lys") or {}).items()
                if int(k) in lights and v}
+    SERIAL_TO_LIGHT.clear()
+    SERIAL_TO_LIGHT.update({s: k for k, v in USB_MAP.items() for s in v})
     return USB_MAP
 
 
@@ -823,25 +850,40 @@ def _try_usb(client, batch, t_start):
         targets += [(s, brightness) for s in serials]
     if not lights:
         return batch
-    t0 = stick.set_levels(targets) if stick is not None else None
-    if t0 is None:
+    # Vis ny tilstand i HA med en gang; sendingen til mange dimmere kan ta litt tid
+    t_pre = time.time()
+    for smux_id, brightness, _ in lights:
+        LAST_USB[smux_id] = (brightness, t_pre)
+        publish_light_state(client, smux_id, brightness, force=True)
+    result = stick.set_levels(targets) if stick is not None else None
+    if result is None:
+        for smux_id, _, _ in lights:
+            LAST_USB.pop(smux_id, None)
         if mode == "hybrid":
             return batch  # pinnen virker ikke -- alt går via Home Manager
         log.error("Bare pinne er valgt, men USB-pinnen virker ikke: %d lys ble IKKE styrt (%s)",
                   len(lights), ", ".join(str(REG["names"].get(s, s)) for s, _, _ in lights))
         STATS.add(failed=len(lights))
         return rest
-    for smux_id, brightness, _ in lights:
-        LAST_USB[smux_id] = (brightness, t0)
+    t0, acked = result
     _finish_batch(client, [(s, b, None) for s, b, _ in lights], [], [], t_start, "via USB-pinnen")
-    threading.Timer(USB_ACK_S, _check_usb_acks, args=(lights, t0, mode == "hybrid")).start()
+    unconfirmed = []
+    for light in lights:
+        if all(int(x) in acked for x in light[2]):
+            USB_STATS["bekreftet"] += 1
+        else:
+            unconfirmed.append(light + (LAST_CMD_AT.get(light[0]),))
+    if unconfirmed:
+        threading.Timer(USB_ACK_S, _check_usb_acks, args=(unconfirmed, t0, mode == "hybrid")).start()
     return rest
 
 
 def _check_usb_acks(lights, t0, fallback=True):
     stick = STICK
-    for smux_id, brightness, serials in lights:
-        if LAST_CMD_AT.get(smux_id, 0) > t0 + 0.5:
+    for light in lights:
+        smux_id, brightness, serials = light[:3]
+        marker = light[3] if len(light) > 3 else None
+        if (LAST_CMD_AT.get(smux_id) != marker) if marker is not None else LAST_CMD_AT.get(smux_id, 0) > t0 + 0.5:
             continue  # en nyere kommando er gitt siden -- denne er utdatert
         missing = [s for s in serials if not (stick and stick.acked_since(s, t0))]
         if not missing:
@@ -877,7 +919,7 @@ def start_usb_stick():
     log.info("Lysstyring: %s", "bare USB-pinne" if mode == "pinne" else
              "hybrid (USB-pinne, Home Manager som reserve)")
     n = len(load_usb_map())
-    STICK = usbstick.UsbStick()
+    STICK = usbstick.UsbStick(on_radio=_on_usb_radio)
     threading.Thread(target=STICK.run, daemon=True, name="usb").start()
     if n:
         log.info("USB-kart lastet: %d lys har serienumre", n)
@@ -937,6 +979,7 @@ def _finish_batch(client, armed_lights, armed_switches, applied_climate, t_start
         publish_light_state(client, smux_id, brightness, force=True)
         PENDING_CONFIRM[smux_id] = (brightness, now)
         LAST_CMD_AT[smux_id] = now
+        LAST_CMD_PCT[smux_id] = (brightness, how)
     for smux_id, on, _ in armed_switches:
         publish_switch_state(client, smux_id, on, force=True)
     for smux_id, target in applied_climate:
@@ -2030,7 +2073,7 @@ class Api:
                                                 "siste_feil": ""}
         info.update({"aktivert": light_mode() != "home_manager", "modus": light_mode(),
                      "ubekreftet": USB_STATS["ubekreftet"], "bekreftet_hm": USB_STATS["bekreftet_hm"],
-                     "lys_med_kart": len(USB_MAP),
+                     "lys_med_kart": len(USB_MAP), "radio_dimmere": list(RADIO_LOG)[-25:],
                      "lys_totalt": len(xc.LIGHTS), "bekreftet": USB_STATS["bekreftet"],
                      "via_reserve": USB_STATS["reserve"],
                      "kart": [{"id": k, "navn": REG["names"].get(k, str(k)), "serienr": v}

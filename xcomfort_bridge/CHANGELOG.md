@@ -1,5 +1,24 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.7.0 (2026-11-01)
+
+### USB-pinnen er mer pålitelig
+- Pinnen sender nå til én dimmer om gangen og venter kort (maks 0,35 s)
+  på kvitteringen før den sender til neste. Før ble alt sendt rett etter
+  hverandre, og da kolliderte kvitteringene med neste melding på radio.
+  Kommer det ikke kvittering, prøver pinnen én gang til før Home Manager
+  tar over. Store bolker (f.eks. «slå av alt») venter maks 2,5 sekunder
+  totalt.
+- HA viser ny tilstand med en gang, før sendingen er ferdig.
+- Lys som er kvittert av pinnen regnes som bekreftet med en gang.
+
+### Feilsøking
+- Nytt under Verktøy → USB-pinne: **Radiomeldinger til og fra dimmerne**.
+  Viser hva Home Manager sender til hver dimmer og hva dimmerne melder
+  tilbake, sammen med siste kommando fra HA. Brukes til å sammenligne
+  lysstyrke via pinnen og via Home Manager.
+- Feilsøkingsdelene lukker seg ikke lenger når siden oppdateres.
+
 ## 2.6.2 (2026-11-01)
 
 ### Rettet: USB-pinnen var ustabil
