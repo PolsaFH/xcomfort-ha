@@ -47,7 +47,7 @@ import usbstick
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.7.0"
+BRIDGE_VERSION = "2.7.1"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -755,7 +755,12 @@ USB_ACK_S = 3.0        # pinnens kvittering ELLER status fra lampa via Home Mana
 USB_GRACE_S = 10.0      # så lenge stoler vi på det vi sendte framfor gamle verdier fra Home Manager
 LAST_USB = {}           # lys-smux -> (prosent, tid)
 _force_hm = {}          # lys-smux -> tid; neste kommando skal via Home Manager
-USB_STATS = {"bekreftet": 0, "bekreftet_hm": 0, "reserve": 0, "ubekreftet": 0}
+USB_STATS = {"bekreftet": 0, "bekreftet_hm": 0, "reserve": 0, "ubekreftet": 0, "stor_bolk": 0}
+# Hybrid: bolker til flere dimmere enn dette går rett via Home Manager. Pinnen
+# sender til én dimmer om gangen og venter på kvittering, så 16 utelys tok
+# 3,3 s og de fleste måtte likevel sendes på nytt. Home Manager tar samme
+# bolk på 0,15 s.
+USB_MAX_DIMMERE_HYBRID = 6
 
 
 SERIAL_TO_LIGHT = {}    # dimmer-serienr -> lys-smux
@@ -829,6 +834,23 @@ def light_mode():
     return "home_manager" if OPTS.get("usb_pinne") is False else "hybrid"  # gammel innstilling (2.5.0)
 
 
+def _usb_confirmed(smux_id, t0, serials=()):
+    """Alle dimmerne i lyset kvitterte via pinnen: regn lyset som bekreftet
+    (ellers ville det telt som «ubekreftet» etter LYS_BEKREFT_S hvis Home
+    Manager ikke får vite om endringen)."""
+    USB_STATS["bekreftet"] += 1
+    pending = PENDING_CONFIRM.pop(smux_id, None)
+    if pending is not None:
+        stick = STICK
+        acks = [stick.last_ack.get(int(x), 0) for x in serials] if stick else []
+        t_ack = max(acks) if acks and min(acks) >= t0 else time.time()
+        with STATS.lock:
+            STATS.bekreftet += 1
+            STATS.responstider.append({"navn": REG["names"].get(smux_id, str(smux_id)),
+                                       "sek": max(0.0, t_ack - t0),
+                                       "tid": time.strftime("%H:%M:%S")})
+
+
 def _try_usb(client, batch, t_start):
     """Sender lys som har serienumre via pinnen. Returnerer resten av bolken
     (det som skal via Home Manager)."""
@@ -850,6 +872,10 @@ def _try_usb(client, batch, t_start):
         targets += [(s, brightness) for s in serials]
     if not lights:
         return batch
+    if mode == "hybrid" and len(targets) > USB_MAX_DIMMERE_HYBRID:
+        USB_STATS["stor_bolk"] += 1
+        log.info("Stor bolk (%d dimmere) sendes via Home Manager, det går raskere enn pinnen", len(targets))
+        return batch
     # Vis ny tilstand i HA med en gang; sendingen til mange dimmere kan ta litt tid
     t_pre = time.time()
     for smux_id, brightness, _ in lights:
@@ -870,7 +896,7 @@ def _try_usb(client, batch, t_start):
     unconfirmed = []
     for light in lights:
         if all(int(x) in acked for x in light[2]):
-            USB_STATS["bekreftet"] += 1
+            _usb_confirmed(light[0], t0, light[2])
         else:
             unconfirmed.append(light + (LAST_CMD_AT.get(light[0]),))
     if unconfirmed:
@@ -887,7 +913,7 @@ def _check_usb_acks(lights, t0, fallback=True):
             continue  # en nyere kommando er gitt siden -- denne er utdatert
         missing = [s for s in serials if not (stick and stick.acked_since(s, t0))]
         if not missing:
-            USB_STATS["bekreftet"] += 1
+            _usb_confirmed(smux_id, t0, serials)
             continue
         pending = PENDING_CONFIRM.get(smux_id)
         if pending is None or pending[1] < t0 - 0.5:
@@ -2075,7 +2101,7 @@ class Api:
                      "ubekreftet": USB_STATS["ubekreftet"], "bekreftet_hm": USB_STATS["bekreftet_hm"],
                      "lys_med_kart": len(USB_MAP), "radio_dimmere": list(RADIO_LOG)[-25:],
                      "lys_totalt": len(xc.LIGHTS), "bekreftet": USB_STATS["bekreftet"],
-                     "via_reserve": USB_STATS["reserve"],
+                     "via_reserve": USB_STATS["reserve"], "store_bolker": USB_STATS["stor_bolk"],
                      "kart": [{"id": k, "navn": REG["names"].get(k, str(k)), "serienr": v}
                               for k, v in sorted(USB_MAP.items(), key=lambda kv: REG["names"].get(kv[0], ""))]})
         return info

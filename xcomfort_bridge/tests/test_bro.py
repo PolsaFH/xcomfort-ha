@@ -772,6 +772,9 @@ class TestUsbPinne(unittest.TestCase):
             self.assertEqual(fake.commands("set_value"), [])
             self.assertEqual(json.loads(client.last(f"xcomfort/light/{smux}/state")),
                              {"state": "ON", "brightness": 40})
+            # Kvittert av pinnen = bekreftet, skal ikke telle som ubekreftet etter 15 s
+            self.assertNotIn(smux, bro.PENDING_CONFIRM)
+            self.assertEqual(bro.USB_STATS["bekreftet"], 1)
             time.sleep(0.3)
             bro._check_usb_acks([(smux, 40, [2746356, 2746386])], time.time() - 1)
             self.assertEqual(bro._pending_commands, [])
@@ -880,6 +883,20 @@ class TestLysstyring(TestUsbPinne):
         finally:
             fake.close()
 
+    def test_stor_bolk_gaar_via_home_manager_i_hybrid(self):
+        fake = FakeHM()
+        tr = FakeTransport()
+        try:
+            bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
+            bro.USB_MAP = {smux: list(range(1, bro.USB_MAX_DIMMERE_HYBRID + 2))}
+            bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"ON","brightness":30}')])
+            self.assertEqual([w for w in tr.written if w[2] == 0x1B], [])
+            self.assertEqual([c for _, c in fake.commands("set_value")], ["set_value 110 30"])
+            self.assertEqual(bro.USB_STATS["stor_bolk"], 1)
+            stick.stopping = True
+        finally:
+            fake.close()
+
     def test_gammel_innstilling_respekteres(self):
         fake = FakeHM()
         try:
@@ -984,6 +1001,17 @@ class TestUsbLesing(unittest.TestCase):
         time.sleep(0.3)
         self.assertTrue(st.acked_since(9290836, 0))
         st.stopping = True
+
+    def test_pinne_som_faller_ut_kobles_til_igjen(self):
+        import usbstick
+        tr = FakeTransport()
+        st = usbstick.UsbStick(transport_factory=lambda: tr)
+        self.assertTrue(st.connect())
+        st._broken("test")
+        self.assertIsNone(st.transport)
+        self.assertFalse(st.healthy())
+        self.assertTrue(st.connect())
+        self.assertTrue(st.healthy())
 
 
 class TestUsbOmsending(unittest.TestCase):

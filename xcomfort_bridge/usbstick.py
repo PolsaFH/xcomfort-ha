@@ -7,7 +7,7 @@ en gang.
 
 Protokollen er funnet ved å ta opp trafikken mellom MRF og pinnen
 (30.10.2026). Bare kommandoene MRF selv bruker når et lys testes, brukes:
-    0x50 = på (forrige nivå), 0x51 = av, 0x5A + 01 00 <prosent> = sett nivå
+    0x50 = på (forrige nivå), 0x51 = av, 0x5A + 01 00 <nivå 0-255> = sett nivå (prosent x 2,55)
 
 Ramme til/fra pinnen: 5A <lengde> <kode> <data> A5, sendt som 62 bytes
 over USB (interrupt-endepunkt). "Send radiomelding" er kode 0x1B:
@@ -140,9 +140,10 @@ class PyUsbTransport:
         # kvitteringer) blir da borte, og to meldinger tett på hverandre gir
         # "[Errno 75] Overflow". Det var feilen i 2.5.0-2.6.1.
         size = getattr(self.ep_in, "wMaxPacketSize", 0) or PACKET
+        timeout_error = getattr(usb.core, "USBTimeoutError", ())   # finnes i pyusb 1.2+
         try:
             return bytes(self.ep_in.read(size, timeout=timeout_ms))
-        except usb.core.USBTimeoutError:
+        except timeout_error:
             return None
         except usb.core.USBError as e:
             errno = getattr(e, "errno", None)
@@ -233,8 +234,11 @@ class UsbStick:
             if not self.ok and not self.connect():
                 time.sleep(RETRY_OPEN_S)
                 continue
+            t = self.transport
+            if t is None:       # pinnen ble nettopp koblet fra av sendingen
+                continue
             try:
-                data = self.transport.read(500)
+                data = t.read(500)
                 self._read_errors = 0
             except TransientUsbError as e:
                 self._read_errors += 1
@@ -335,7 +339,8 @@ class UsbStick:
                             self.retries += 1
                             continue
                         break
-                    time.sleep(FRAME_GAP_S)
+                    if i < len(targets) - 1:
+                        time.sleep(FRAME_GAP_S)
             except Exception as e:  # noqa: BLE001
                 self.failed += 1
                 broken = str(e)

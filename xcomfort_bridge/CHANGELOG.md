@@ -1,5 +1,29 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.7.1 (2026-11-01)
+
+Gjennomgang av koden og loggene fra 2.7.0. Ingen nye funksjoner, bare rettelser.
+
+### Rettet
+- **Store bolker gikk tregt via pinnen (hybrid).** Loggen viste at 16 utelys
+  tok 3,3 sekunder via pinnen, og 12 av dem måtte likevel sendes på nytt via
+  Home Manager. Home Manager tok de samme 12 på 0,15 sekunder, og alle ble
+  bekreftet. Nå går bolker til mer enn 6 dimmere rett via Home Manager i
+  hybrid. Enkeltlys og små grupper går fortsatt via pinnen. Valget «pinne»
+  er uendret.
+- Lys som pinnen fikk kvittering på, ble likevel telt som «ubekreftet» i
+  diagnostikken etter 15 sekunder hvis Home Manager ikke fikk med seg
+  endringen. Nå regnes de som bekreftet med en gang, med riktig responstid.
+  (Det sto i endringsloggen for 2.7.0, men var ikke gjort helt.)
+- Liten risiko for en unødvendig «lesefeil» i loggen akkurat når pinnen ble
+  koblet fra under sending. Rettet.
+- Fjernet en unødvendig pause på 0,06 s etter siste dimmer i hver bolk.
+- Tålte ikke eldre versjoner av USB-biblioteket (pyusb før 1.2). Nå gjør den
+  det.
+- Kommentar i `usbstick.py` sa at nivået sendes i prosent. Det sendes som
+  0–255.
+- README beskrev feil ventetid for reserven (1,5 s). Oppdatert.
+
 ## 2.7.0 (2026-11-01)
 
 ### USB-pinnen er mer pålitelig

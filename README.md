@@ -297,9 +297,10 @@ Lysene reagerer da med en gang. Home Manager brukes fortsatt som reserve og
 for alt annet.
 
 1. Sett pinnen i maskinen som kjører Home Assistant, helst sentralt i huset.
-2. Lag USB-kartet på PC-en med `lag_usb_kart.py`. Det trenger MRF-eksporten
-   og en xSetup-backup, og lager `usb_kart.json` med hvilke dimmere
-   (serienumre) som hører til hvert lys.
+2. Lag USB-kartet på PC-en med `lag_usb_kart.py` (et eget PC-verktøy, ikke
+   med i dette repoet ennå). Det trenger MRF-eksporten og en xSetup-backup,
+   og lager `usb_kart.json` med hvilke dimmere (serienumre) som hører til
+   hvert lys.
 3. På nettsiden: **Verktøy → USB-pinne → Last opp USB-kart**.
 4. Sjekk at det står «Pinnen er tilkoblet» og at lysene har serienumre.
 
@@ -307,7 +308,7 @@ Innstillingen **Lysstyring** bestemmer hva som brukes:
 
 | Valg | Betyr |
 |---|---|
-| `hybrid` (standard) | Pinnen først. Svarer ikke en dimmer innen 1,5 sekunder, eller pinnen mangler, brukes Home Manager |
+| `hybrid` (standard) | Pinnen først. Hver dimmer får inntil 0,35 sekunder på å kvittere, og ett nytt forsøk. Har verken pinnen eller Home Manager sett at lyset endret seg etter 3 sekunder, eller pinnen mangler, brukes Home Manager. Bolker til mer enn 6 dimmere (f.eks. alle utelys) går rett via Home Manager, fordi det er raskere |
 | `pinne` | Bare pinnen, uten reserve |
 | `home_manager` | Bare Home Manager, slik det var før pinnen |
 
