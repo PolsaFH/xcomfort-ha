@@ -1,5 +1,17 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.6.2 (2026-11-01)
+
+### Rettet: USB-pinnen var ustabil
+- Broen leste 64 bytes om gangen fra pinnen, men pinnen sender pakker på
+  62 bytes. Da ventet USB-biblioteket på enda en pakke etter hver melding.
+  Enkeltmeldinger, som kvitteringer fra dimmerne, ble borte, og to
+  meldinger tett etter hverandre ga feilen «[Errno 75] Overflow». Ved den
+  feilen koblet broen fra pinnen og brukte Home Manager i opptil 30
+  sekunder før den prøvde igjen. Nå leses nøyaktig én pakke om gangen.
+- En enkelt lesefeil kobler ikke lenger fra pinnen. Bare 20 feil på rad gjør
+  det.
+
 ## 2.6.1 (2026-10-30)
 
 ### Rettet (USB-pinne)

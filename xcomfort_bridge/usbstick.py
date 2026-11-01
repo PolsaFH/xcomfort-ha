@@ -87,6 +87,10 @@ def parse_radio(frame):
     return frame[3], src, dst
 
 
+class TransientUsbError(IOError):
+    """En enkelt lesing feilet, men pinnen virker (f.eks. overflow)."""
+
+
 class PyUsbTransport:
     """Den ekte USB-forbindelsen (pyusb/libusb). Brukes i appen."""
 
@@ -129,13 +133,21 @@ class PyUsbTransport:
 
     def read(self, timeout_ms):
         import usb.core
+        # Les NØYAKTIG én pakke (62 bytes). Ber man om 64, venter libusb på en
+        # pakke til etter en full 62-byte-pakke: enkeltmeldinger (som
+        # kvitteringer) blir da borte, og to meldinger tett på hverandre gir
+        # "[Errno 75] Overflow". Det var feilen i 2.5.0-2.6.1.
+        size = getattr(self.ep_in, "wMaxPacketSize", 0) or PACKET
         try:
-            return bytes(self.ep_in.read(64, timeout=timeout_ms))
+            return bytes(self.ep_in.read(size, timeout=timeout_ms))
         except usb.core.USBTimeoutError:
             return None
         except usb.core.USBError as e:
-            if getattr(e, "errno", None) == 110 or "timed out" in str(e).lower():
+            errno = getattr(e, "errno", None)
+            if errno == 110 or "timed out" in str(e).lower():
                 return None
+            if errno == 75 or "overflow" in str(e).lower():
+                raise TransientUsbError(str(e))
             raise
 
     def close(self):
@@ -167,6 +179,7 @@ class UsbStick:
         self.recent = collections.deque(maxlen=20)   # siste rammer fra pinnen (for feilsøking)
         self.connected_at = 0.0
         self._warned_deaf = False
+        self._read_errors = 0
 
     # -- tilkobling --
     def connect(self):
@@ -188,7 +201,10 @@ class UsbStick:
                 time.sleep(0.02)
             end = time.time() + 1.0
             while time.time() < end:
-                data = t.read(100)
+                try:
+                    data = t.read(100)
+                except TransientUsbError:
+                    continue
                 if data and b"CKOZ" in data:
                     self.name = data[3:data.index(b"\x00", 3)].decode("ascii", "replace") \
                         if b"\x00" in data[3:] else "CKOZ"
@@ -215,6 +231,13 @@ class UsbStick:
                 continue
             try:
                 data = self.transport.read(500)
+                self._read_errors = 0
+            except TransientUsbError as e:
+                self._read_errors += 1
+                self.last_error = f"lesefeil: {e}"
+                if self._read_errors >= 20:
+                    self._broken(f"mange lesefeil på rad: {e}")
+                continue
             except Exception as e:  # noqa: BLE001
                 self._broken(f"lesefeil: {e}")
                 continue

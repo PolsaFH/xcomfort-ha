@@ -941,5 +941,50 @@ class TestUsbBekreftHM(TestUsbPinne):
         self.assertEqual((snap["mottatt"], snap["radio_mottatt"], snap["kvitteringer"]), (1, 1, 1))
 
 
+class TestUsbLesing(unittest.TestCase):
+    def test_leser_noyaktig_en_pakke(self):
+        import usbstick
+        asked = []
+
+        class Ep:
+            wMaxPacketSize = 62
+
+            def read(self, n, timeout=0):
+                asked.append(n)
+                return bytearray(b"\x5a\x06\x02\x07\x31\xa5" + bytes(56))
+
+        t = usbstick.PyUsbTransport(None, Ep(), None)
+        import importlib.util
+        if importlib.util.find_spec("usb") is None:
+            self.skipTest("pyusb ikke installert")
+        self.assertEqual(t.read(100)[:2], b"\x5a\x06")
+        self.assertEqual(asked, [62])
+
+    def test_enkelt_lesefeil_kobler_ikke_fra(self):
+        import usbstick
+
+        class T(FakeTransport):
+            def __init__(self):
+                super().__init__()
+                self.errors = 3
+
+            def read(self, timeout_ms):
+                if self.errors:
+                    self.errors -= 1
+                    raise usbstick.TransientUsbError("[Errno 75] Overflow")
+                return super().read(timeout_ms)
+
+        tr = T()
+        st = usbstick.UsbStick(transport_factory=lambda: tr)
+        self.assertTrue(st.connect())
+        threading.Thread(target=st.run, daemon=True).start()
+        time.sleep(0.3)
+        self.assertTrue(st.healthy())
+        self.assertIsNotNone(st.set_levels([(9290836, 50)]))
+        time.sleep(0.3)
+        self.assertTrue(st.acked_since(9290836, 0))
+        st.stopping = True
+
+
 if __name__ == "__main__":
     unittest.main()
