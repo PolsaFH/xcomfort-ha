@@ -1,7 +1,7 @@
-name: "xComfort MQTT-bro"
-version: "2.8.0"
+name: "xComfort MQTT Bridge"
+version: "3.0.0"
 slug: "xcomfort_bridge"
-description: "Lokal styring av Eaton xComfort / Sensio via Home Manager, uten sky. Valgfri USB-pinne for lynrask lysstyring."
+description: "Local control of Eaton xComfort / Sensio through the Home Manager. No cloud. Optional USB stick for instant light control."
 arch:
   - aarch64
   - amd64
@@ -10,12 +10,12 @@ arch:
 startup: application
 boot: auto
 init: false
-# Helsesjekk: broen svarer paa http://<app>:8099/health (bare internt i HA,
-# porten aapnes ikke mot nettverket ditt). Slaa paa "Watchdog" i appens
-# Info-fane, saa starter Supervisor broen paa nytt hvis den krasjer/henger.
+# Health check: the bridge answers on http://<app>:8099/health (internal to HA
+# only, the port is not opened to your network). Turn on "Watchdog" on the
+# app's Info tab and the Supervisor restarts the bridge if it crashes or hangs.
 watchdog: "http://[HOST]:[PORT:8099]/health"
-# Appens egen nettside i sidepanelet i HA (status, logg, testknapper, verktoey).
-# USB: gir appen tilgang til xComfort-pinnen CKOZ-00/13 (valgfri).
+# The app's own web page in the HA sidebar.
+# USB: gives the app access to the xComfort USB stick CKOZ-00/13 (optional).
 usb: true
 ingress: true
 ingress_port: 8099
@@ -30,16 +30,16 @@ options:
   mqtt_password: ""
   log_level: "info"
   poll_interval: 20
-  markise_posisjon: true
-  markise_kjoretid_balkong: 20
-  markise_kjoretid_paviljong: 34
-  markise_kjoretid_boblebad: 25
-  markise_pause_mellom_kommandoer: 0.5
-  markise_dobbel_stopp: true
-  markise_gjenta_bevegelse: false
-  hurtig_status: true
-  lysbrytere_som_lys: false
-  lysstyring: hybrid
+  light_control: hybrid
+  instant_status: true
+  switches_as_lights: false
+  awning_position: true
+  awning_runtime_balcony: 20
+  awning_runtime_pavilion: 34
+  awning_runtime_hot_tub: 25
+  awning_command_gap: 0.5
+  awning_double_stop: true
+  awning_repeat_move: false
 schema:
   xcomfort_ip: str
   xcomfort_port: port
@@ -49,14 +49,13 @@ schema:
   mqtt_password: password
   log_level: list(debug|info|warning)
   poll_interval: int(5,300)
-  markise_posisjon: bool
-  markise_kjoretid_balkong: float(1,120)
-  markise_kjoretid_paviljong: float(1,120)
-  markise_kjoretid_boblebad: float(1,120)
-  markise_pause_mellom_kommandoer: float(0,5)
-  markise_dobbel_stopp: bool
-  markise_gjenta_bevegelse: bool
-  hurtig_status: bool
-  lysbrytere_som_lys: bool
-  lysstyring: list(hybrid|pinne|home_manager)
-  usb_pinne: bool?
+  light_control: list(hybrid|usb_stick|home_manager)
+  instant_status: bool
+  switches_as_lights: bool
+  awning_position: bool
+  awning_runtime_balcony: float(1,120)
+  awning_runtime_pavilion: float(1,120)
+  awning_runtime_hot_tub: float(1,120)
+  awning_command_gap: float(0,5)
+  awning_double_stop: bool
+  awning_repeat_move: bool

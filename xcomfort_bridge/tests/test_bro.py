@@ -235,7 +235,7 @@ class TestMarkiseKoe(unittest.TestCase):
     def test_pause_mellom_telegrammer_og_dobbel_stopp(self):
         fake = FakeHM()
         try:
-            bro, xc = load_bridge(fake, markise_pause_mellom_kommandoer=0.3, markise_dobbel_stopp=True)
+            bro, xc = load_bridge(fake, awning_command_gap=0.3, awning_double_stop=True)
             client = FakeClient()
             for sid in (124354, 65125, 50980):
                 bro.MARKISER_CTRL.enqueue(sid, "inn")
@@ -269,7 +269,7 @@ class TestMarkiseKoe(unittest.TestCase):
     def test_markise_sender_selv_om_pollingen_holder_laasen(self):
         fake = FakeHM()
         try:
-            bro, xc = load_bridge(fake, markise_pause_mellom_kommandoer=0.0)
+            bro, xc = load_bridge(fake, awning_command_gap=0.0)
             client = FakeClient()
             bro.MARKISER_CTRL.enqueue(65125, "stopp")
             with bro.conn_lock:   # pollingen/lys-bolken holder laasen
@@ -281,7 +281,7 @@ class TestMarkiseKoe(unittest.TestCase):
     def test_set_position_kjoerer_og_stopper_selv(self):
         fake = FakeHM()
         try:
-            bro, xc = load_bridge(fake, markise_pause_mellom_kommandoer=0.0, markise_dobbel_stopp=False)
+            bro, xc = load_bridge(fake, awning_command_gap=0.0, awning_double_stop=False)
             m = bro.MARKISER_CTRL.markiser[50980]
             m.runtime = 2.0
             client = FakeClient()
@@ -305,7 +305,7 @@ class TestMarkiseRekkefoelge(unittest.TestCase):
         boblebad. Den ekstra stopp-en maa IKKE komme etter 'inn'."""
         fake = FakeHM()
         try:
-            bro, xc = load_bridge(fake, markise_pause_mellom_kommandoer=0.3, markise_dobbel_stopp=True)
+            bro, xc = load_bridge(fake, awning_command_gap=0.3, awning_double_stop=True)
             bro.MARKISER_CTRL.markiser[65125].position = 98.0
             bro.MARKISER_CTRL.enqueue(65125, "stopp")
             bro.MARKISER_CTRL.enqueue(65125, "inn")
@@ -430,7 +430,7 @@ class TestRegister(unittest.TestCase):
         self.bro.LINK.subscribed_at[oid] = 0
         self.bro.on_hm_object(oid, "IN_Test", ["11", "1", "2"])
         ev = json.loads(self.client.last(self.bro.event_topic(oid)))
-        self.assertEqual(ev, {"event_type": "langt_opp", "kode": 2})
+        self.assertEqual(ev, {"event_type": "long_up", "code": 2})
         self.bro.LINK = None
 
     def test_unique_id_er_uendret(self):
@@ -638,13 +638,28 @@ class TestNettside(unittest.TestCase):
 
 
 class TestInnstillinger(unittest.TestCase):
+    def test_gamle_norske_innstillinger_leses(self):
+        fake = FakeHM()
+        try:
+            bro, _xc = load_bridge(fake)
+            path = os.path.join(os.path.dirname(bro.EXTRA_FILE), "options.json")
+            with open(path, "w") as f:
+                json.dump({"xcomfort_ip": "1.2.3.4", "lysstyring": "pinne", "hurtig_status": False,
+                           "markise_kjoretid_balkong": 18}, f)
+            bro.OPTIONS_FILE = path
+            o = bro.load_options()
+            self.assertEqual((o["light_control"], o["instant_status"], o["awning_runtime_balcony"]),
+                             ("usb_stick", False, 18.0))
+        finally:
+            fake.close()
+
     def test_tom_ip_stopper_med_tydelig_feil(self):
         fake = FakeHM()
         try:
             bro, _xc = load_bridge(fake, xcomfort_ip="")
-            with self.assertLogs("xcomfort.bro", level="ERROR") as cm, self.assertRaises(SystemExit):
+            with self.assertLogs("xcomfort.bridge", level="ERROR") as cm, self.assertRaises(SystemExit):
                 bro.main()
-            self.assertIn("IP er ikke fylt inn", "\n".join(cm.output))
+            self.assertIn("IP is not set", "\n".join(cm.output))
         finally:
             fake.close()
 
@@ -847,7 +862,7 @@ class TestLysstyring(TestUsbPinne):
         tr = FakeTransport()
         try:
             bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
-            bro.OPTS["lysstyring"] = "home_manager"
+            bro.OPTS["light_control"] = "home_manager"
             bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"ON","brightness":30}')])
             self.assertEqual([w for w in tr.written if w[2] == 0x1B], [])
             self.assertEqual([c for _, c in fake.commands("set_value")], ["set_value 110 30"])
@@ -860,7 +875,7 @@ class TestLysstyring(TestUsbPinne):
         tr = FakeTransport(ack=False)
         try:
             bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
-            bro.OPTS["lysstyring"] = "pinne"
+            bro.OPTS["light_control"] = "usb_stick"
             t0 = time.time()
             bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"ON","brightness":30}')])
             bro._check_usb_acks([(smux, 30, [2000001, 2000002], bro.LAST_CMD_AT[smux])], t0, fallback=False)
@@ -876,7 +891,7 @@ class TestLysstyring(TestUsbPinne):
         tr = FakeTransport()
         try:
             bro, xc, stick, smux = self._bridge_with_stick(fake, tr)
-            bro.OPTS["lysstyring"] = "pinne"
+            bro.OPTS["light_control"] = "usb_stick"
             tr.fail = True
             before = bro.STATS.failed
             bro._process_command_batch(FakeClient(), [("light", smux, b'{"state":"OFF"}')])
@@ -904,11 +919,11 @@ class TestLysstyring(TestUsbPinne):
         fake = FakeHM()
         try:
             bro, xc = load_bridge(fake)
-            bro.OPTS.pop("lysstyring", None)
+            bro.OPTS.pop("light_control", None)
             bro.OPTS["usb_pinne"] = False
             self.assertEqual(bro.light_mode(), "home_manager")
-            bro.OPTS["lysstyring"] = "pinne"
-            self.assertEqual(bro.light_mode(), "pinne")
+            bro.OPTS["light_control"] = "usb_stick"
+            self.assertEqual(bro.light_mode(), "usb_stick")
         finally:
             fake.close()
 
@@ -1258,7 +1273,7 @@ class TestUsbOmsending(unittest.TestCase):
             bro.save_usb_map({smux: [1234567]})
             frame = bytes.fromhex("5a2603530000001e3402071fb1cb74000087d61200b1cb74000000000000000000007e3e97e2fcfea5")
             bro._on_usb_radio(frame, (0x53, 7654321, 1234567))
-            self.assertEqual(bro.RADIO_LOG[-1]["retning"], "til dimmer")
+            self.assertEqual(bro.RADIO_LOG[-1]["retning"], "to dimmer")
         finally:
             fake.close()
 

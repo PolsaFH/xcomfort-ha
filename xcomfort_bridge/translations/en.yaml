@@ -1,53 +1,52 @@
 configuration:
   xcomfort_ip:
     name: Home Manager IP
-    description: "Må fylles inn. Lokal IP-adresse til xComfort Home Manager, f.eks. 192.168.1.50. Gi Home Manager fast IP i ruteren."
+    description: "Required. Local IP address of the xComfort Home Manager, e.g. 192.168.1.50. Give the Home Manager a fixed address in your router."
   xcomfort_port:
     name: Home Manager port
+    description: Almost never needs to be changed.
   mqtt_host:
-    name: MQTT-megler
+    name: MQTT broker
+    description: "core-mosquitto is correct if you use the Mosquitto broker app."
   mqtt_port:
-    name: MQTT-port
+    name: MQTT port
   mqtt_username:
-    name: MQTT-brukernavn
-    description: "Må fylles inn. En Home Assistant-bruker (f.eks. en egen bruker kalt xcomfort) som broen logger inn på Mosquitto med."
+    name: MQTT username
+    description: "Required. A Home Assistant user (e.g. a separate user called xcomfort) that the app logs in to Mosquitto with."
   mqtt_password:
-    name: MQTT-passord
-    description: Passordet til MQTT-brukeren over.
+    name: MQTT password
+    description: The password for the MQTT user above.
   log_level:
-    name: Loggnivå
-    description: "info = vanlig. debug = logger ALT som sendes til og fra Home Manager (bruk ved feilsøking)."
+    name: Log level
+    description: "info is normal. debug logs EVERYTHING sent to and from the Home Manager (use when troubleshooting)."
   poll_interval:
-    name: Avlesningsintervall (sek)
-    description: Hvor ofte broen leser av alle enheter for å se endringer gjort utenfor HA.
-  markise_posisjon:
-    name: Markise-posisjon (tidsbasert)
-    description: Regner ut omtrentlig posisjon (0–100 %) ut fra kjøretid, og lar HA sette posisjon direkte. Markise-innstillingene gjelder foreløpig bare markiser som er lagt inn i koden.
-  markise_kjoretid_balkong:
-    name: Kjøretid balkong (sek)
-    description: Tid fra helt inne til helt ute.
-  markise_kjoretid_paviljong:
-    name: Kjøretid paviljong (sek)
-  markise_kjoretid_boblebad:
-    name: Kjøretid boblebad (sek)
-  markise_pause_mellom_kommandoer:
-    name: Pause mellom markise-kommandoer (sek)
-    description: Minste tid mellom to radiotelegrammer til markisene, så de ikke kolliderer.
-  markise_dobbel_stopp:
-    name: Send «stopp» to ganger
-    description: Sender stopp en ekstra gang etter 0,8 sek. Alltid trygt, og hjelper hvis det første telegrammet ikke kom fram.
-  markise_gjenta_bevegelse:
-    name: Gjenta «ut»/«inn» én gang (TEST FØRST)
-    description: Sender ut/inn en ekstra gang etter 1,5 sek. Slå bare på etter at testen har vist at en ekstra «ut» ikke stopper markisen.
-  hurtig_status:
-    name: Hurtig status (lytte-forbindelse)
-    description: Holder en forbindelse åpen mot Home Manager og får endringer med en gang (under 1 sek) i stedet for å vente på neste avlesning. Knapper blir egne hendelses-enheter. Slå av bare ved feilsøking.
-  lysbrytere_som_lys:
-    name: Lysbrytere også som lys
-    description: Lager i tillegg en lys-enhet for de av/på-bryterne som er lagt inn i koden som lys (f.eks. taklamper), så de havner under Lys i HA og Google Home. Bryter-enhetene beholdes.
-  lysstyring:
-    name: Lysstyring
-    description: "hybrid = USB-pinnen først, Home Manager hvis pinnen mangler eller en dimmer ikke svarer (anbefalt, og helt trygt uten pinne). Bolker til mer enn 6 dimmere (f.eks. alle utelys) går rett via Home Manager, fordi det er raskere. pinne = bare USB-pinnen, ingen reserve. home_manager = bare Home Manager, slik det var før pinnen. Lys uten USB-kart går alltid via Home Manager. Brytere, termostater og markiser går alltid via Home Manager."
-  usb_pinne:
-    name: (Gammel) Bruk USB-pinne
-    description: "Erstattet av «Lysstyring». La stå tom."
+    name: Poll interval (seconds)
+    description: How often everything is read when instant status is off.
+  light_control:
+    name: Light control
+    description: "hybrid = the USB stick first, and the Home Manager when there is no stick or a dimmer does not answer (recommended, and completely safe without a stick). Batches to more than 6 dimmers go straight through the Home Manager, because it is faster. usb_stick = the USB stick only, no fallback. home_manager = the Home Manager only. Lights without dimmers in the USB map always use the Home Manager, and so do switches, thermostats and awnings."
+  instant_status:
+    name: Instant status
+    description: Keeps a connection open to the Home Manager and receives changes right away (under 1 second) instead of waiting for the next poll. Required for wall buttons. Only turn off when troubleshooting.
+  switches_as_lights:
+    name: On/off switches as lights too
+    description: Also creates a light entity for the on/off switches that are lights (for example ceiling lights), so they show up under Lights in Home Assistant and Google Home. The switch entities are kept.
+  awning_position:
+    name: Awning position (time based)
+    description: Calculates an approximate position (0-100 %) from the running time, and lets Home Assistant set a position directly. The awning settings currently apply to awnings built into the code only.
+  awning_runtime_balcony:
+    name: Running time, balcony awning (seconds)
+    description: Time from fully retracted to fully extended.
+  awning_runtime_pavilion:
+    name: Running time, pavilion awning (seconds)
+  awning_runtime_hot_tub:
+    name: Running time, hot tub awning (seconds)
+  awning_command_gap:
+    name: Pause between awning commands (seconds)
+    description: Minimum time between two radio telegrams to the awnings, so they do not collide.
+  awning_double_stop:
+    name: Send "stop" twice
+    description: Sends stop once more after 0.8 seconds. Always safe, and helps if the first telegram did not arrive.
+  awning_repeat_move:
+    name: Repeat "extend" and "retract" once (test first)
+    description: Sends extend or retract once more after 1.5 seconds. Only turn on after testing that an extra command does not stop your motor.

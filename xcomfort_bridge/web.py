@@ -88,7 +88,7 @@ def make_handler(api):
                 problems = api.health()
                 return self._send(200 if not problems else 503, {"ok": not problems, "problemer": problems})
             if not self._client_ok():
-                return self._send(403, {"feil": "bare via Home Assistant"})
+                return self._send(403, {"feil": "only via Home Assistant"})
             try:
                 if path in ("/", "/index.html"):
                     with open(INDEX_FILE, "rb") as f:
@@ -112,13 +112,13 @@ def make_handler(api):
                 if path == "/api/usb":
                     return self._send(200, api.usb())
             except Exception as e:  # noqa: BLE001
-                log.exception("Feil i nettsiden")
+                log.exception("Error in the web page")
                 return self._send(500, {"feil": str(e)})
-            return self._send(404, {"feil": "finnes ikke"})
+            return self._send(404, {"feil": "not found"})
 
         def do_POST(self):  # noqa: N802
             if not self._client_ok():
-                return self._send(403, {"feil": "bare via Home Assistant"})
+                return self._send(403, {"feil": "only via Home Assistant"})
             path, _ = self._path()
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -138,9 +138,9 @@ def make_handler(api):
                 if path == "/api/usb/kart":
                     return self._send(200, api.usb_map_upload(body))
             except Exception as e:  # noqa: BLE001
-                log.exception("Feil i nettsiden")
+                log.exception("Error in the web page")
                 return self._send(500, {"feil": str(e)})
-            return self._send(404, {"feil": "finnes ikke"})
+            return self._send(404, {"feil": "not found"})
 
     return Handler
 
@@ -149,10 +149,10 @@ def start(api, port):
     try:
         server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(api))
     except OSError as e:
-        log.warning("Klarte ikke starte nettsiden på port %d: %s", port, e)
+        log.warning("Could not start the web page on port %d: %s", port, e)
         return None
     threading.Thread(target=server.serve_forever, daemon=True, name="web").start()
-    log.info("Nettside og helsesjekk kjører på port %d", port)
+    log.info("Web page and health check running on port %d", port)
     return server
 
 

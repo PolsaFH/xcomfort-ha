@@ -123,7 +123,7 @@ class IdMap:
                     if got == n:
                         continue
                     if got is not None and name_key(got) == name_key(n):
-                        log.info("%s heter nå %s i Home Manager (samme nummer)", n, got)
+                        log.info("%s is now called %s in Home Manager (same number)", n, got)
                         self.expected[k] = got
                         continue
                     missing[k] = n
@@ -140,7 +140,7 @@ class IdMap:
                 if missing:
                     lo = max(1, min(self.cur(k) for k in missing) - WINDOW)
                     hi = max(self.cur(k) for k in missing) + WINDOW
-                    log.info("Leter etter %d objekt(er) med nytt nummer (nr. %d-%d) ...", len(missing), lo, hi)
+                    log.info("Looking for %d object(s) with a new number (no. %d-%d) ...", len(missing), lo, hi)
                     seen = self._ask(conn, range(lo, hi + 1))
                     by_key = _unique_by_key(seen.items())
                     for k in list(missing):
@@ -153,10 +153,10 @@ class IdMap:
             for k, name, old, new in changes:
                 self.current[k] = new
                 self.expected[k] = name
-                log.warning("%s har fått nytt nummer i Home Manager: %d -> %d (fulgt opp automatisk)",
+                log.warning("%s got a new number in Home Manager: %d -> %d (followed automatically)",
                             name, old, new)
             for k, name in missing.items():
-                log.warning("Fant ikke %s i Home Manager (sist kjent som nr. %d). Er den slettet i xSetup?",
+                log.warning("Could not find %s in Home Manager (last known as no. %d). Was it deleted in xSetup?",
                             name, self.cur(k))
             if changes:
                 self._save()

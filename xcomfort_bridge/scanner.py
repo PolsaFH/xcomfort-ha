@@ -19,7 +19,7 @@ import time
 
 import xcomfort_local_control as xc
 
-log = logging.getLogger("xcomfort.skann")
+log = logging.getLogger("xcomfort.scan")
 
 NAME_TYPE_RE = re.compile(r"(?:SSN|RSN) (\d+) (\S+) (\d+)")
 
@@ -72,7 +72,7 @@ class Scanner:
         self.found = 0
         self.started = time.strftime("%Y-%m-%d %H:%M:%S")
         found = {}
-        log.info("Starter søk etter alle objekter i Home Manager (ID 1–%d og videre) ...", max_id)
+        log.info("Searching for all objects in Home Manager (ID 1-%d and beyond) ...", max_id)
         conn = None
         try:
             conn = xc.XComfortConn()
@@ -92,10 +92,10 @@ class Scanner:
                 start += BATCH
             self.objects = found
             self._save()
-            log.info("Søket er ferdig: fant %d objekter", len(found))
+            log.info("Search finished: found %d objects", len(found))
         except Exception as e:  # noqa: BLE001
             self.error = str(e)
-            log.error("Søket stoppet: %s", e)
+            log.error("Search stopped: %s", e)
         finally:
             if conn:
                 conn.close()

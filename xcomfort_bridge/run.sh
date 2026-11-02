@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -e
-# Alle innstillinger leses direkte fra /data/options.json av broen selv.
-echo "Starter xComfort MQTT-bro ..."
+# All settings are read from /data/options.json by the bridge itself.
+echo "Starting xComfort MQTT Bridge ..."
 exec python3 -u /app/xcomfort_mqtt_bridge.py

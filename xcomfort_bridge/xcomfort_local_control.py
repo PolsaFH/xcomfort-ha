@@ -69,7 +69,7 @@ import time
 # Felles logger. Broen (xcomfort_mqtt_bridge.py) setter opp format med
 # millisekunder og loggnivaa; naar denne fila kjoeres som CLI settes et
 # enkelt format opp i main().
-_log = logging.getLogger("xcomfort.protokoll")
+_log = logging.getLogger("xcomfort.protocol")
 
 CONTROLLER_IP = os.environ.get("XCOMFORT_IP", "")   # Home Manager sin lokale IP (settes i appens innstillinger / XCOMFORT_IP)
 CONTROLLER_PORT = int(os.environ.get("XCOMFORT_PORT", "10023"))
@@ -121,7 +121,7 @@ class XComfortConn:
         if b"connect" not in self.buf:
             got = self.buf[:120]
             self.close()
-            raise ConnectionError(f"Fikk ikke <connect .../> fra Home Manager innen {timeout:.0f}s (mottok {got!r})")
+            raise ConnectionError(f"No <connect .../> from Home Manager within {timeout:.0f}s (received {got!r})")
         self.buf = b""  # ferdig med handshaken, ikke la den forstyrre parsing senere
         # Kort timeout paa recv() fremover -- ellers blokkerer hvert kall i
         # helt opp til "timeout" sekunder naar kontrolleren rett og slett
@@ -294,15 +294,15 @@ def get_device_objects(conn, smux_id, cache):
     key = str(smux_id)
     if key in cache and cache[key].get("val_id") and cache[key].get("set_id"):
         return cache[key]
-    _log.info("Ny lampe (smuxId=%s) -- leter etter styre-objekter (skjer kun foerste gang)...", smux_id)
+    _log.info("New lamp (smuxId=%s) -- looking for its control objects (first time only)...", smux_id)
     info = discover_device_objects(conn, smux_id, quiet=True)
     if not info or not info.get("val_id") or not info.get("set_id"):
-        _log.warning("Fant IKKE styre-objekter for lampe %s (utenfor +/-%s rundt smuxId, eller ikke en dimmer).",
+        _log.warning("Did NOT find control objects for lamp %s (outside +/-%s around smuxId, or not a dimmer).",
                      smux_id, SCAN_RANGE)
         return None
     cache[key] = info
     save_cache(cache)
-    _log.info("  Funnet: Val-id=%s  SET-id=%s  (lagret til neste gang)", info["val_id"], info["set_id"])
+    _log.info("  Found: Val-id=%s  SET-id=%s  (saved for next time)", info["val_id"], info["set_id"])
     return info
 
 
@@ -432,14 +432,14 @@ def get_switch_objects(conn, smux_id, cache):
     key = str(smux_id)
     if key in cache and cache[key].get("on_id") and cache[key].get("off_id"):
         return cache[key]
-    _log.info("Ny bryter (smuxId=%s) -- leter etter av/paa-knapper (skjer kun foerste gang)...", smux_id)
+    _log.info("New switch (smuxId=%s) -- looking for its on/off objects (first time only)...", smux_id)
     info = discover_switch_objects(conn, smux_id, quiet=True)
     if not info or not info.get("on_id") or not info.get("off_id"):
-        _log.warning("Fant IKKE av/paa-knapper for bryter %s. Se naermere paa den med debug_switch.py.", smux_id)
+        _log.warning("Did NOT find on/off objects for switch %s.", smux_id)
         return None
     cache[key] = info
     save_cache(cache)
-    _log.info("  Funnet: On-id=%s  Off-id=%s  (lagret til neste gang)", info["on_id"], info["off_id"])
+    _log.info("  Found: On-id=%s  Off-id=%s  (saved for next time)", info["on_id"], info["off_id"])
     return info
 
 

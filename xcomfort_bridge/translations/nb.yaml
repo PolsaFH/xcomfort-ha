@@ -1,0 +1,52 @@
+configuration:
+  xcomfort_ip:
+    name: Home Manager IP
+    description: "Må fylles inn. Lokal IP-adresse til xComfort Home Manager, f.eks. 192.168.1.50. Gi Home Manager fast adresse i ruteren."
+  xcomfort_port:
+    name: Home Manager port
+    description: Trenger nesten aldri å endres.
+  mqtt_host:
+    name: MQTT-megler
+    description: "core-mosquitto er riktig hvis du bruker Mosquitto broker-appen."
+  mqtt_port:
+    name: MQTT-port
+  mqtt_username:
+    name: MQTT-brukernavn
+    description: "Må fylles inn. En Home Assistant-bruker (f.eks. en egen bruker kalt xcomfort) som appen logger inn på Mosquitto med."
+  mqtt_password:
+    name: MQTT-passord
+    description: Passordet til MQTT-brukeren over.
+  log_level:
+    name: Loggnivå
+    description: "info er vanlig. debug logger ALT som sendes til og fra Home Manager (bruk ved feilsøking)."
+  poll_interval:
+    name: Avlesningsintervall (sekunder)
+    description: Hvor ofte alt leses av når hurtig status er av.
+  light_control:
+    name: Lysstyring
+    description: "hybrid = USB-pinnen først, og Home Manager når det ikke er noen pinne eller en dimmer ikke svarer (anbefalt, og helt trygt uten pinne). Bolker til mer enn 6 dimmere går rett via Home Manager, fordi det er raskere. usb_stick = bare USB-pinnen, ingen reserve. home_manager = bare Home Manager. Lys uten dimmere i USB-kartet går alltid via Home Manager, og det samme gjør brytere, termostater og markiser."
+  instant_status:
+    name: Hurtig status
+    description: Holder en forbindelse åpen mot Home Manager og får endringer med en gang (under 1 sekund) i stedet for å vente på neste avlesning. Kreves for veggknapper. Slå bare av ved feilsøking.
+  switches_as_lights:
+    name: Av/på-brytere også som lys
+    description: Lager i tillegg en lys-enhet for av/på-bryterne som er lys (f.eks. taklamper), så de havner under Lys i Home Assistant og Google Home. Bryter-enhetene beholdes.
+  awning_position:
+    name: Markise-posisjon (tidsbasert)
+    description: Regner ut omtrentlig posisjon (0-100 %) fra kjøretiden, og lar Home Assistant sette posisjon direkte. Markise-innstillingene gjelder foreløpig bare markiser som er lagt inn i koden.
+  awning_runtime_balcony:
+    name: Kjøretid, markise balkong (sekunder)
+    description: Tid fra helt inne til helt ute.
+  awning_runtime_pavilion:
+    name: Kjøretid, markise paviljong (sekunder)
+  awning_runtime_hot_tub:
+    name: Kjøretid, markise boblebad (sekunder)
+  awning_command_gap:
+    name: Pause mellom markise-kommandoer (sekunder)
+    description: Minste tid mellom to radiotelegrammer til markisene, så de ikke kolliderer.
+  awning_double_stop:
+    name: Send «stopp» to ganger
+    description: Sender stopp én gang til etter 0,8 sekunder. Alltid trygt, og hjelper hvis det første telegrammet ikke kom fram.
+  awning_repeat_move:
+    name: Gjenta «ut» og «inn» én gang (test først)
+    description: Sender ut eller inn én gang til etter 1,5 sekunder. Slå bare på etter at du har testet at en ekstra kommando ikke stopper motoren.

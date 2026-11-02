@@ -24,7 +24,7 @@ import time
 
 import xcomfort_local_control as xc
 
-log = logging.getLogger("xcomfort.lytter")
+log = logging.getLogger("xcomfort.listener")
 
 FRAME_RE = re.compile(r"(?:oid \S+ )?(SSN|RSN) (\d+) (\S+) ?(.*)")
 ACK_RE = re.compile(r"x_bm_st (\w+)")
@@ -103,7 +103,7 @@ class HMLink:
             try:
                 self.conn.sock.sendall(data)
             except OSError as e:
-                log.warning("Klarte ikke sende på lytte-forbindelsen: %s", e)
+                log.warning("Could not send on the listener connection: %s", e)
                 return False
         return True
 
@@ -123,7 +123,7 @@ class HMLink:
                 conn = xc.XComfortConn()
             except Exception as e:  # noqa: BLE001
                 self.connected = False
-                log.warning("Lytte-forbindelsen fikk ikke kontakt med Home Manager: %s (prøver igjen om %.0fs)",
+                log.warning("The listener connection could not reach Home Manager: %s (retrying in %.0fs)",
                             e, delay)
                 time.sleep(delay)
                 delay = min(delay * 2, 60)
@@ -136,12 +136,12 @@ class HMLink:
             self.connects += 1
             self.last_rx = time.time()
             self._buf = b""
-            log.info("Lytte-forbindelse til Home Manager er oppe (abonnerer på %d objekter)", len(self.ids))
+            log.info("Listener connection to Home Manager is up (subscribed to %d objects)", len(self.ids))
             try:
                 self._send_subscriptions(sorted(self.ids))
                 self._read_loop(conn)
             except Exception as e:  # noqa: BLE001
-                log.warning("Lytte-forbindelsen ble brutt: %s -- kobler til igjen", e)
+                log.warning("The listener connection was lost: %s -- reconnecting", e)
             finally:
                 self.connected = False
                 with self.lock:
@@ -155,10 +155,10 @@ class HMLink:
                 data = conn.sock.recv(65536)
             except socket.timeout:
                 if time.time() - self.last_rx > SILENCE_RECONNECT_S:
-                    raise ConnectionError(f"ingenting mottatt på {SILENCE_RECONNECT_S}s")
+                    raise ConnectionError(f"nothing received for {SILENCE_RECONNECT_S}s")
                 continue
             if not data:
-                raise ConnectionError("Home Manager lukket forbindelsen")
+                raise ConnectionError("Home Manager closed the connection")
             self.last_rx = time.time()
             self.feed(data)
 
@@ -181,6 +181,6 @@ class HMLink:
                 elif parsed[0] == "annet" and self.on_other:
                     self.on_other(parsed[1])
             except Exception:  # noqa: BLE001
-                log.exception("Feil ved behandling av melding fra Home Manager: %r", text[:200])
+                log.exception("Error while handling a message from Home Manager: %r", text[:200])
         if len(self._buf) > 65536:  # søppel uten sluttbyte -- kast
             self._buf = b""

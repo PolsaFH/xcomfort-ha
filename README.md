@@ -2,281 +2,271 @@
   <img src="xcomfort_bridge/logo.png" alt="xComfort for Home Assistant" width="320">
 </p>
 
-<h3 align="center">Eaton / Sensio xComfort i Home Assistant. Helt lokalt.</h3>
+<h3 align="center">Eaton / Sensio xComfort in Home Assistant. Fully local.</h3>
 
 <p align="center">
-  Ingen sky. Ingen app. Ingen ventetid.<br>
-  Lys, brytere, markiser, termostater, sensorer og veggknapper rett inn i Home Assistant,<br>
-  med en valgfri USB-pinne som styrer lysene direkte over radio.
+  No cloud. No app. No waiting.<br>
+  Lights, switches, awnings, thermostats, sensors and wall buttons straight into Home Assistant,<br>
+  with an optional USB stick that controls the lights directly over radio.
 </p>
 
 <p align="center">
-  <a href="https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FPolsaFH%2Fxcomfort-ha"><img src="https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg" alt="Legg til i Home Assistant"></a>
+  <b>🇬🇧 English</b> · <a href="README.no.md">🇳🇴 Norsk</a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Home%20Assistant-app-41BDF5?logo=homeassistant&logoColor=white" alt="Home Assistant-app">
-  <img src="https://img.shields.io/badge/100%25-lokalt-12a150" alt="100 % lokalt">
-  <img src="https://img.shields.io/badge/sky-ikke%20n%C3%B8dvendig-7c3aed" alt="Ingen sky">
-  <img src="https://github.com/PolsaFH/xcomfort-ha/actions/workflows/tester.yml/badge.svg" alt="Tester">
+  <a href="https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FPolsaFH%2Fxcomfort-ha"><img src="https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg" alt="Add to Home Assistant"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Home%20Assistant-app-41BDF5?logo=homeassistant&logoColor=white" alt="Home Assistant app">
+  <img src="https://img.shields.io/badge/100%25-local-12a150" alt="100 % local">
+  <img src="https://img.shields.io/badge/cloud-not%20needed-7c3aed" alt="No cloud">
+  <img src="https://img.shields.io/github/license/PolsaFH/xcomfort-ha" alt="License">
+  <img src="https://github.com/PolsaFH/xcomfort-ha/actions/workflows/tester.yml/badge.svg" alt="Tests">
 </p>
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="bilder/hjem-mork.png">
-    <img src="bilder/hjem.png" alt="Nettsiden i Home Assistant" width="900">
+    <source media="(prefers-color-scheme: dark)" srcset="images/home-dark.png">
+    <img src="images/home.png" alt="The web page in Home Assistant" width="900">
   </picture>
 </p>
 
 > [!WARNING]
-> **Tidlig versjon.** Appen er laget på og testet grundig i ett hus med ca. 100 xComfort-enheter.
-> Nå åpnes den for flere. Den gjør ingenting med anlegget ditt før du selv velger hva som skal inn,
-> men ta en sikkerhetskopi av Home Assistant først, og si gjerne fra under
-> [Issues](https://github.com/PolsaFH/xcomfort-ha/issues) hvis noe ikke virker.
-
-<details>
-<summary><b>🇬🇧 English summary</b></summary>
-
-A Home Assistant app (add-on) that connects an **Eaton / Sensio xComfort Home Manager** (the controller
-used with the eoptHome app) to Home Assistant, **fully locally** over the same TCP protocol the official
-app uses (port 10023). No cloud, no app, no internet.
-
-- Lights, switches and wall buttons are discovered from the Home Manager and added from a built-in web page.
-- Changes made with wall switches show up in Home Assistant in under a second.
-- Optional: plug in the **CKOZ-00/13 USB stick** (the one used by MRF) and lights are controlled directly
-  over radio, with automatic fallback to the Home Manager. The app can learn which dimmers belong to
-  each light by itself.
-- Everything appears through MQTT discovery. No YAML needed.
-
-The documentation is in Norwegian, since xComfort/Sensio is mostly used in Norway. Issues in English are welcome.
-</details>
+> **Early version.** The app was built for and tested thoroughly in one house with about 100 xComfort devices.
+> It is now open to everyone. It does nothing to your installation until you choose what to add, but take a
+> backup of Home Assistant first, and please report anything that does not work under
+> [Issues](https://github.com/PolsaFH/xcomfort-ha/issues).
 
 ---
 
-## Innhold
+## Contents
 
-- [Hvorfor](#hvorfor)
-- [Dette får du](#dette-får-du)
-- [Kom i gang på 10 minutter](#kom-i-gang-på-10-minutter)
-- [Nettsiden](#nettsiden)
-- [USB-pinnen: lys på et øyeblikk](#usb-pinnen-lys-på-et-øyeblikk)
-- [Veggknapper i automasjoner](#veggknapper-i-automasjoner)
-- [Innstillinger](#innstillinger)
-- [Slik virker det](#slik-virker-det)
-- [Når du endrer noe i xSetup eller MRF](#når-du-endrer-noe-i-xsetup-eller-mrf)
-- [Feilsøking](#feilsøking)
-- [Begrensninger](#begrensninger)
-- [Sikkerhet](#sikkerhet)
-- [For utviklere](#for-utviklere)
-
----
-
-## Hvorfor
-
-xComfort er et solid radiobasert anlegg, men det er låst til eoptHome-appen og Eatons sky. Det betyr
-treg respons, ingen ordentlig kobling til resten av hjemmet, og at alt stopper hvis skyen gjør det.
-
-Denne appen snakker direkte med Home Manager på ditt lokale nettverk, akkurat som eoptHome-appen gjør
-selv. Protokollen er kartlagt fra bunnen av. Resultatet er at xComfort blir en helt vanlig del av Home
-Assistant: i dashbord, automasjoner, stemmestyring og Google Home eller Apple Home.
+- [Why](#why)
+- [What you get](#what-you-get)
+- [Up and running in 10 minutes](#up-and-running-in-10-minutes)
+- [The web page](#the-web-page)
+- [The USB stick: instant lights](#the-usb-stick-instant-lights)
+- [Wall buttons in automations](#wall-buttons-in-automations)
+- [Settings](#settings)
+- [How it works](#how-it-works)
+- [When you change something in xSetup or MRF](#when-you-change-something-in-xsetup-or-mrf)
+- [Troubleshooting](#troubleshooting)
+- [Limitations](#limitations)
+- [Security](#security)
+- [For developers](#for-developers)
 
 ---
 
-## Dette får du
+## Why
+
+xComfort is a solid radio based system, but it is locked to the eoptHome app and Eaton's cloud. That means slow
+response, no proper connection to the rest of your home, and everything stops when the cloud does.
+
+This app talks directly to the **Home Manager** on your local network, exactly like the eoptHome app does. The
+protocol was mapped from scratch. The result is that xComfort becomes a normal part of Home Assistant: in
+dashboards, automations, voice control and Google Home or Apple Home.
+
+**Which controller?** The app is built for the **Sensio X1 / xComfort Home Manager** used with eoptHome and
+xSetup (common in Norway). If you have Eaton's newer **xComfort Bridge** or the older **Smart Home Controller
+(SHC)**, there are other integrations for those. Other Home Manager models may work too. Please tell us if you
+try.
+
+---
+
+## What you get
 
 | | |
 |---|---|
-| 💡 **Lys med lysstyrke** | Dimmere blir `light` i Home Assistant. Endringer fra veggbryteren vises på under ett sekund. |
-| 🔌 **Av/på-brytere** | Terrassevarmere, vifter, lyskastere og andre aktuatorer blir `switch`. |
-| 🔘 **Veggknapper som smarte knapper** | Kort trykk, langt trykk og slipp blir hendelser. Bruk dem til musikk, scener eller hva som helst. |
-| 📡 **USB-pinne (valgfritt)** | Lysene styres direkte over radio og reagerer med en gang. Home Manager tar over hvis en dimmer ikke svarer. |
-| 🧠 **Lærer selv** | Finner enhetene i Home Manager, og finner hvilke dimmere hvert lys styrer. Ingen nummer å skrive inn. |
-| 🔁 **Tåler endringer** | Laster du opp fra xSetup og objektene får nye numre, finner appen dem igjen på navn. Automasjonene dine fortsetter å virke. |
-| 🖥️ **Egen nettside** | Status, rom, knapper, logg og verktøy, rett i sidepanelet i Home Assistant. Mørk modus og mobil. |
-| 📊 **Diagnostikk** | Responstid, radiotrafikk og feil som egne sensorer, så du kan få varsel hvis noe går galt. |
-| 🔒 **100 % lokalt** | Ingen konto, ingen sky, ingen internett. Virker også når nettet er nede. |
+| 💡 **Dimmable lights** | Dimmers become `light` entities. Changes from a wall switch show up in under a second. |
+| 🔌 **On/off switches** | Patio heaters, fans, floodlights and other actuators become `switch` entities. |
+| 🔘 **Wall buttons as smart buttons** | Short press, long press and release become events. Use them for music, scenes or anything else. |
+| 📡 **USB stick (optional)** | Lights are controlled directly over radio and react instantly. The Home Manager takes over if a dimmer does not answer. |
+| 🧠 **Learns by itself** | Finds the devices in the Home Manager, and finds which dimmers each light controls. No numbers to type in. |
+| 🔁 **Survives changes** | When an upload from xSetup gives objects new numbers, the app finds them again by name. Your automations keep working. |
+| 🖥️ **Its own web page** | Status, rooms, buttons, log and tools, right in the Home Assistant sidebar. Dark mode and mobile friendly. |
+| 📊 **Diagnostics** | Response time, radio traffic and errors as sensors, so you can be notified when something goes wrong. |
+| 🔒 **100 % local** | No account, no cloud, no internet. Works when the internet is down. |
 
 ---
 
-## Kom i gang på 10 minutter
+## Up and running in 10 minutes
 
-### Dette trenger du
+### What you need
 
-- **Home Assistant OS eller Supervised.** Det er der apper (add-ons) finnes.
-- **Mosquitto broker**-appen og **MQTT**-integrasjonen. Har du ikke det: *Innstillinger → Apper →
-  Appbutikk → Mosquitto broker → Installer → Start*. HA foreslår så MQTT-integrasjonen av seg selv.
-- **En egen bruker til appen**, f.eks. `xcomfort`: *Innstillinger → Personer → Brukere → Legg til*.
-  Mosquitto godtar Home Assistant-brukere automatisk.
-- **IP-adressen til Home Manager.** Gi den fast adresse i ruteren (DHCP-reservasjon), ellers mister
-  appen kontakten den dagen adressen endrer seg.
+- **Home Assistant OS or Supervised.** That is where apps (add-ons) are available.
+- The **Mosquitto broker** app and the **MQTT** integration. Don't have them? *Settings → Apps → App store →
+  Mosquitto broker → Install → Start*. Home Assistant then suggests the MQTT integration by itself.
+- **A separate user for the app**, e.g. `xcomfort`: *Settings → People → Users → Add*. Mosquitto accepts Home
+  Assistant users automatically.
+- **The IP address of the Home Manager.** Give it a fixed address in your router (DHCP reservation), or the app
+  loses contact the day the address changes.
 
-Du trenger **ikke** eoptHome-appen, Eaton-kontoen eller internett.
+You do **not** need the eoptHome app, an Eaton account or internet access.
 
-### 1. Installer
+### 1. Install
 
-Trykk på knappen øverst, eller gjør det for hånd:
+Press the button at the top, or do it by hand:
 
-1. *Innstillinger → Apper → Appbutikk → ⋮ → Repositories*
-2. Lim inn `https://github.com/PolsaFH/xcomfort-ha` og trykk **Legg til**.
-3. Finn **xComfort MQTT-bro** i listen og trykk **Installer**.
+1. *Settings → Apps → App store → ⋮ → Repositories*
+2. Paste `https://github.com/PolsaFH/xcomfort-ha` and press **Add**.
+3. Find **xComfort MQTT Bridge** in the list and press **Install**.
 
-### 2. Fyll inn tre ting
+### 2. Fill in three things
 
-Under fanen **Konfigurasjon**:
+On the **Configuration** tab:
 
-| Felt | Eksempel |
+| Field | Example |
 |---|---|
 | Home Manager IP | `192.168.1.50` |
-| MQTT-brukernavn | `xcomfort` |
-| MQTT-passord | passordet til brukeren over |
+| MQTT username | `xcomfort` |
+| MQTT password | the password of the user above |
 
-Resten kan stå som det er.
+Everything else can stay as it is.
 
 ### 3. Start
 
-Under fanen **Info**: slå på **Start ved oppstart**, **Watchdog** og **Vis i sidepanelet**, og trykk
-**Start**.
+On the **Info** tab: turn on **Start on boot**, **Watchdog** and **Show in sidebar**, and press **Start**.
 
-### 4. Finn enhetene dine
+### 4. Find your devices
 
-Åpne **xComfort** i sidepanelet. Første gang møter du en veiviser:
+Open **xComfort** in the sidebar. The first time, a guide welcomes you:
 
-<p align="center"><img src="bilder/enheter.png" alt="Legg til enheter" width="820"></p>
+<p align="center"><img src="images/devices.png" alt="Add devices" width="820"></p>
 
-1. Trykk **Start søk**. Appen går gjennom alt Home Manager har (10 til 20 minutter, påvirker ikke radioen).
-2. Gi lys, brytere og knapper et navn og et rom.
-3. Trykk **Legg til valgte i Home Assistant**.
+1. Press **Start search**. The app goes through everything in the Home Manager (10 to 20 minutes, does not affect the radio).
+2. Give lights, switches and buttons a name and a room.
+3. Press **Add selected to Home Assistant**.
 
-Ferdig. Enhetene ligger nå under *Innstillinger → Enheter og tjenester → MQTT*, sortert per rom, og du kan
-bruke dem som alt annet i Home Assistant.
-
----
-
-## Nettsiden
-
-| Fane | Hva du finner |
-|---|---|
-| **Hjem** | «Alt fungerer», eller nøyaktig hva som er galt. Nøkkeltall, markiser og en levende liste over alt som skjer i huset. |
-| **Rom** | Alle enheter per rom. Trykk for av/på, dra for å dimme, «Slå av alt» per rom. Blyanten endrer navn og rom. |
-| **Knapper** | Alle veggknapper med siste trykk. Trykker du på en ny knapp i huset, dukker den opp her og kan legges til med ett trykk. |
-| **Enheter** | Søk i Home Manager, legg til nye enheter, finn objekter og ta sikkerhetskopi. |
-| **USB-pinne** | Status for pinnen, automatisk læring av hvilke dimmere hvert lys styrer, og feilsøking. |
-| **Logg** | Fargekodet logg med filter, søk, pause og nedlasting, og rå trafikk fra Home Manager. |
-
-<p align="center"><img src="bilder/rom.png" alt="Rom" width="820"></p>
+Done. The devices are now under *Settings → Devices & services → MQTT*, sorted by room, ready to use like
+anything else in Home Assistant.
 
 ---
 
-## USB-pinnen: lys på et øyeblikk
+## The web page
 
-Home Manager sender lyskommandoer videre over radio, og mange anlegg er satt opp med flere sekunders
-dimmetid. Med xComfort-pinnen **CKOZ-00/13** (den samme USB-pinnen som MRF bruker) i maskinen som kjører
-Home Assistant, sender appen kommandoene **rett til dimmeren**. Lyset reagerer med en gang.
-
-<p align="center"><img src="bilder/usb.png" alt="USB-pinne" width="820"></p>
-
-1. Sett pinnen i Home Assistant-maskinen, helst sentralt i huset. Den kan settes inn og tas ut mens
-   appen kjører.
-2. Åpne **USB-pinne** på nettsiden og trykk **Finn dimmere**. Appen sender en kommando via Home Manager
-   til ett lys om gangen og lytter på hvilke dimmere som får den. Lysene endrer seg ikke synlig.
-3. Ferdig. Lys med dimmere i kartet styres nå direkte.
-
-**Trygt som standard.** Innstillingen **Lysstyring** bestemmer hva som brukes:
-
-| Valg | Betyr |
+| Tab | What you find |
 |---|---|
-| `hybrid` (standard) | Pinnen først. Hver dimmer får 0,35 sekunder på å svare, og ett nytt forsøk. Har verken pinnen eller Home Manager sett at lyset endret seg etter 3 sekunder, sender Home Manager kommandoen. Store bolker (mer enn 6 dimmere, f.eks. alle utelys) går rett via Home Manager, fordi det er raskere. Uten pinne virker alt som før. |
-| `pinne` | Bare pinnen, uten reserve. |
-| `home_manager` | Bare Home Manager. Pinnen brukes ikke. |
+| **Home** | «Everything is working», or exactly what is wrong. Key numbers, awnings and a live list of everything happening in the house. |
+| **Rooms** | All devices by room. Click for on/off, drag to dim, «Turn all off» per room. The pencil changes name and room. |
+| **Buttons** | All wall buttons with their last press. Press a new button in the house and it shows up here, ready to add with one click. |
+| **Devices** | Search the Home Manager, add new devices, find objects and download a backup. |
+| **USB stick** | Stick status, automatic learning of which dimmers each light controls, and troubleshooting. |
+| **Log** | Colour coded log with filter, search, pause and download, plus raw traffic from the Home Manager. |
 
-Brytere, termostater og markiser går alltid via Home Manager.
+<p align="center"><img src="images/rooms.png" alt="Rooms" width="820"></p>
 
-> Pinnen kan bare brukes av ett program om gangen. Skal du bruke MRF, flytt pinnen til PC-en og sett den
-> tilbake etterpå. Appen bruker Home Manager så lenge pinnen er borte, og finner den igjen av seg selv.
+---
+
+## The USB stick: instant lights
+
+The Home Manager forwards light commands over radio, and many installations are set up with a dimming time of
+several seconds. With the xComfort stick **CKOZ-00/13** (the same USB stick MRF uses) in the machine that runs
+Home Assistant, the app sends commands **straight to the dimmer**. The light reacts instantly.
+
+<p align="center"><img src="images/usb.png" alt="USB stick" width="820"></p>
+
+1. Plug the stick into the Home Assistant machine, preferably in the middle of the house. It can be plugged in
+   and out while the app is running.
+2. Open **USB stick** on the web page and press **Find dimmers**. The app sends a command through the Home
+   Manager to one light at a time and listens for which dimmers receive it. The lights do not visibly change.
+3. Done. Lights with dimmers in the map are now controlled directly.
+
+**Safe by default.** The **Light control** setting decides what is used:
+
+| Value | Meaning |
+|---|---|
+| `hybrid` (default) | The stick first. Each dimmer gets 0.35 seconds to answer, and one more try. If neither the stick nor the Home Manager has seen the light change after 3 seconds, the Home Manager sends the command. Batches to more than 6 dimmers (e.g. all outdoor lights) go straight through the Home Manager, because it is faster. Without a stick everything works as before. |
+| `usb_stick` | The stick only, no fallback. |
+| `home_manager` | The Home Manager only. The stick is not used. |
+
+Switches, thermostats and awnings always go through the Home Manager.
+
+> The stick can only be used by one program at a time. To use MRF, move the stick to your PC and put it back
+> afterwards. The app uses the Home Manager while the stick is away, and finds it again by itself.
 
 <details>
-<summary>Lage kartet selv fra MRF (for spesielt interesserte)</summary>
+<summary>Build the map yourself from MRF (for the curious)</summary>
 
-Har du MRF-eksporten og en xSetup-backup, kan kartet også lages med
-[`verktoy/lag_usb_kart.py`](verktoy/lag_usb_kart.py) og lastes opp under *USB-pinne → Last opp et kart
-fra fil*. Formatet er `{"lys": {"<smuxId>": [serienummer, ...]}}`.
+If you have the MRF export and an xSetup backup, the map can also be built with
+[`tools/make_usb_map.py`](tools/make_usb_map.py) and uploaded under *USB stick → Upload a map from a file*.
+The format is `{"lys": {"<smuxId>": [serial, ...]}}`.
 </details>
 
 ---
 
-## Veggknapper i automasjoner
+## Wall buttons in automations
 
-En xComfort-knapp kan styre helt andre ting enn lys: musikk, scener, garasjeport, hva som helst.
+An xComfort button can control things other than lights: music, scenes, the garage door, anything.
 
-**1. Gjør knappen synlig for Home Manager.** I MRF: koble knappen til Home Manager og overfør. I xSetup:
-sett datapunktet til **Generell inngang** og last opp.
+**1. Make the button visible to the Home Manager.** In MRF: link the button to the Home Manager and transfer. In
+xSetup: set the datapoint to **General input** and upload.
 
-**2. Legg den til.** Trykk på knappen i huset. Den dukker opp under **Knapper** på nettsiden. Trykk
-**Legg til i HA**.
+**2. Add it.** Press the button in the house. It shows up under **Buttons** on the web page. Press **Add to HA**.
 
-**3. Lag en automasjon.** Knappen er en `event`-enhet med disse trykk-typene:
+**3. Create an automation.** The button is an `event` entity with these event types:
 
-| `event_type` | Betyr |
+| `event_type` | Meaning |
 |---|---|
-| `kort_opp` / `kort_ned` | Kort trykk på øvre / nedre del |
-| `langt_opp` / `langt_ned` | Holder inne øvre / nedre del |
-| `langt_opp_slipp` / `langt_ned_slipp` | Slipper etter langt trykk |
+| `short_up` / `short_down` | Short press on the upper / lower part |
+| `long_up` / `long_down` | Holding the upper / lower part |
+| `long_up_release` / `long_down_release` | Released after a long press |
 
 ```yaml
-alias: Stue knapp 4 - kinomodus
+alias: Living room button 4 - movie mode
 triggers:
-  - trigger: state
-    entity_id: event.stue_brstue4
-    not_from: unavailable
-conditions:
-  - condition: state
-    entity_id: event.stue_brstue4
-    attribute: event_type
-    state: kort_opp
+  - trigger: event.received
+    target:
+      entity_id: event.stue_brstue4
+    options:
+      event_type: [short_up]
 actions:
   - action: scene.turn_on
     target:
-      entity_id: scene.kino
+      entity_id: scene.movie
 mode: single
 ```
 
 **Tips:**
-- **Dobbeltrykk:** vent 0,8 sekunder med `wait_for_trigger` etter første trykk og se om det kommer ett til.
-- **Volum eller dimming mens du holder inne:** start en løkke på `langt_opp` og stopp den på `langt_opp_slipp` (`mode: restart`).
-- Knappen gjør fortsatt det den er programmert til i xComfort i tillegg. Vil du bare bruke den i Home
-  Assistant, ikke koble den til noen aktuator i MRF.
+- **Double press:** wait 0.8 seconds with `wait_for_trigger` after the first press and see if another one comes.
+- **Volume or dimming while holding:** start a loop on `long_up` and stop it on `long_up_release` (`mode: restart`).
+- The button still does what it is programmed to do in xComfort as well. To use it only in Home Assistant,
+  don't link it to any actuator in MRF.
 
 ---
 
-## Innstillinger
+## Settings
 
-| Innstilling | Standard | Hva den gjør |
+| Setting | Default | What it does |
 |---|---|---|
-| Home Manager IP | | Lokal IP til Home Manager. Må fylles inn. |
-| Home Manager port | `10023` | Endres nesten aldri. |
-| MQTT-megler / port | `core-mosquitto` / `1883` | Riktig hvis du bruker Mosquitto-appen. |
-| MQTT-brukernavn / passord | | Brukeren appen logger inn med. Lagres bare i appens innstillinger. |
-| Lysstyring | `hybrid` | `hybrid`, `pinne` eller `home_manager`, se [USB-pinnen](#usb-pinnen-lys-på-et-øyeblikk). |
-| Hurtig status | på | Holder en forbindelse åpen og får endringer på under ett sekund. Kreves for knapper. |
-| Avlesningsintervall | `20` sek | Hvor ofte alt leses av hvis hurtig status er av. |
-| Loggnivå | `info` | `debug` logger all trafikk til og fra Home Manager. |
-| Markise-innstillinger | | Kjøretid, pauser og dobbel stopp. Se [Begrensninger](#begrensninger). |
+| Home Manager IP | | Local IP of the Home Manager. Required. |
+| Home Manager port | `10023` | Almost never changed. |
+| MQTT broker / port | `core-mosquitto` / `1883` | Correct if you use the Mosquitto app. |
+| MQTT username / password | | The user the app logs in with. Stored in the app settings only. |
+| Light control | `hybrid` | `hybrid`, `usb_stick` or `home_manager`, see [the USB stick](#the-usb-stick-instant-lights). |
+| Instant status | on | Keeps a connection open and receives changes in under a second. Required for buttons. |
+| Poll interval | `20` s | How often everything is read when instant status is off. |
+| Log level | `info` | `debug` logs all traffic to and from the Home Manager. |
+| Awning settings | | Running time, pauses and double stop. See [Limitations](#limitations). |
+
+The setting descriptions are shown in Norwegian when Home Assistant is set to Norwegian.
 
 ---
 
-## Slik virker det
+## How it works
 
 ```mermaid
 flowchart LR
-    subgraph Hus["Huset"]
-        D["Dimmere, aktuatorer,<br/>knapper, markiser"]
+    subgraph House["The house"]
+        D["Dimmers, actuators,<br/>buttons, awnings"]
     end
-    subgraph Nett["Lokalt nettverk"]
+    subgraph Net["Local network"]
         HM["xComfort<br/>Home Manager"]
     end
-    subgraph HA["Home Assistant-maskinen"]
-        APP["xComfort MQTT-bro<br/>(denne appen)"]
-        USB["USB-pinne<br/>CKOZ-00/13"]
+    subgraph HA["Home Assistant machine"]
+        APP["xComfort MQTT Bridge<br/>(this app)"]
+        USB["USB stick<br/>CKOZ-00/13"]
         MQ["Mosquitto"]
         CORE["Home Assistant"]
     end
@@ -284,119 +274,123 @@ flowchart LR
     HM <-- "TCP 10023" --> APP
     APP <--> MQ <--> CORE
     APP --- USB
-    USB -. "radio, direkte (valgfritt)" .-> D
+    USB -. "radio, direct (optional)" .-> D
 ```
 
-- Appen holder én forbindelse åpen mot Home Manager. Home Manager sier fra med en gang noe endrer seg.
-- Kommandoer fra Home Assistant går rett til Home Manager, eller rett til dimmeren via USB-pinnen.
-- Alt dukker opp via **MQTT discovery**. Ingen `configuration.yaml`.
-- Hver enhet har en fast `unique_id`, så du kan gi den nytt navn, rom og ikon i Home Assistant uten at noe brekker.
+- The app keeps one connection open to the Home Manager, which reports every change right away.
+- Commands from Home Assistant go straight to the Home Manager, or straight to the dimmer through the USB stick.
+- Everything shows up through **MQTT discovery**. No `configuration.yaml`.
+- Each entity has a fixed `unique_id`, so you can rename it, move it to another area and give it an icon
+  without breaking anything.
 
 ---
 
-## Når du endrer noe i xSetup eller MRF
+## When you change something in xSetup or MRF
 
-Hver gang du laster opp fra xSetup, kan Home Manager gi objekter **nye interne numre**, særlig knapper og
-innganger. Appen tar seg av det:
+Every upload from xSetup can give objects in the Home Manager **new internal numbers**, especially buttons and
+inputs. The app takes care of it:
 
-- Ved oppstart, hver 6. time og etter hvert søk sjekker den at alt har riktig nummer.
-- Har noe fått nytt nummer, finner den det igjen på navn. I loggen står det «fulgt opp automatisk».
-- `entity_id` og `unique_id` i Home Assistant endres **ikke**.
+- At startup, every 6 hours and after each search it checks that everything still has the right number.
+- If something got a new number, it finds it again by name. The log says «followed automatically».
+- `entity_id` and `unique_id` in Home Assistant do **not** change.
 
-Kjør gjerne **Enheter → Søk på nytt** etterpå, og ta en ny sikkerhetskopi.
+Feel free to run **Devices → Search again** afterwards, and download a new backup.
 
-> **Felle:** MRF kan vise et datapunkt som ledig selv om xSetup fortsatt bruker det. Sjekk alltid i xSetup
-> før du velger datapunkt i MRF.
+> **Trap:** MRF can show a datapoint as free even though xSetup still uses it. Always check in xSetup before you
+> choose a datapoint in MRF.
 
 ---
 
-## Feilsøking
+## Troubleshooting
 
-| Problem | Prøv dette |
+| Problem | Try this |
 |---|---|
-| Ingen enheter i Home Assistant | Er MQTT-integrasjonen lagt til, og stemmer brukernavn og passord? Se fanen **Logg**. Har du lagt til enheter under **Enheter**? |
-| Får ikke kontakt med Home Manager | Sjekk IP-adressen. Har Home Manager fått ny adresse? |
-| Søket finner ingen lys | Lys må finnes i xSetup (objektet `D_<navn>`). Se **Enheter → Finn et objekt** for hva Home Manager faktisk har. |
-| Lys reagerer tregt | Se responstid på **Hjem**. Lange tider betyr ofte dårlig radiodekning eller lang dimmetid i MRF. USB-pinnen hjelper. |
-| USB-pinnen blir ikke funnet | Sjekk at den sitter i Home Assistant-maskinen og at MRF ikke bruker den. Appen ser etter den hvert 10. sekund. |
-| «Fikk ikke svar» fra noen lys under læring | De er trolig utenfor rekkevidde for pinnen. De styres fortsatt via Home Manager. Flytt pinnen nærmere og prøv igjen. |
-| En knapp sender ikke noe | Er den **Generell inngang** i xSetup og lastet opp? Dukker den opp under **Knapper** når du trykker? |
-| Trenger mer detaljer | Sett **Loggnivå** til `debug`, gjenta problemet, last ned loggen fra nettsiden og legg den ved en issue. |
+| No devices in Home Assistant | Is the MQTT integration added, and are the username and password correct? See the **Log** tab. Have you added devices under **Devices**? |
+| No contact with the Home Manager | Check the IP address. Did the Home Manager get a new address? |
+| The search finds no lights | Lights must exist in xSetup (the object `D_<name>`). Use **Devices → Find an object** to see what the Home Manager actually has. |
+| Lights react slowly | See the response time on **Home**. Long times usually mean poor radio coverage or a long dimming time in MRF. The USB stick helps. |
+| The USB stick is not found | Check that it is plugged into the Home Assistant machine and that MRF is not using it. The app looks for it every 10 seconds. |
+| «No answer» from some lights while learning | They are probably out of range of the stick. They are still controlled through the Home Manager. Move the stick closer and try again. |
+| A button sends nothing | Is it a **General input** in xSetup, and uploaded? Does it show up under **Buttons** when you press it? |
+| Need more details | Set **Log level** to `debug`, repeat the problem, download the log from the web page and attach it to an issue. |
 
 ---
 
-## Begrensninger
+## Limitations
 
-Ærlig talt, dette gjenstår:
+To be honest, this is what remains:
 
-- **Søket finner lys, brytere og knapper.** Markiser, termostater og sensorer støttes av appen, men kan
-  foreløpig ikke legges til fra nettsiden. Har du slike og vil hjelpe, opprett en issue med navnene fra
-  **Enheter → Finn et objekt**, så legger vi det til.
-- **Testet på ett anlegg** (Sensio X1 / Home Manager med tilleggskontroller). Andre oppsett skal virke,
-  men er ikke bekreftet ennå.
-- **USB-pinnen** er testet med CKOZ-00/13. Radioprotokollen er kartlagt ved å lytte på MRF.
-- Appen er ikke laget av eller støttet av Eaton.
-
----
-
-## Sikkerhet
-
-- Protokollen mot Home Manager er **ukryptert** (slik Eaton har laget den). Hold Home Manager på et lukket
-  hjemmenett og **aldri** åpne port 10023 mot internett.
-- Bruk en egen MQTT-bruker til appen.
-- Appen gjør ingenting med anlegget ditt før du har valgt enheter. Den kjenner igjen anlegget den ble laget
-  på ved å sjekke navnene i Home Manager, og bruker ellers bare det du legger til selv.
-- **Ikke last opp private filer.** MRF-eksporter (`Anlagenkonfiguration*.txt`) inneholder MRF-passordet i
-  klartekst. `.gitignore` stopper de vanligste, men sjekk alltid.
+- **The search finds lights, switches and buttons.** Awnings, thermostats and sensors are supported by the app,
+  but cannot be added from the web page yet. Have some and want to help? Open an issue with the names from
+  **Devices → Find an object**, and we will add it.
+- **Tested on one installation** (Sensio X1 / Home Manager with an extra controller). Other setups should work,
+  but are not confirmed yet.
+- **The USB stick** is tested with the CKOZ-00/13. The radio protocol was mapped by listening to MRF.
+- This app is not made or supported by Eaton.
 
 ---
 
-## For utviklere
+## Security
+
+- The protocol to the Home Manager is **unencrypted** (that is how Eaton made it). Keep the Home Manager on a
+  closed home network and **never** open port 10023 to the internet.
+- Use a separate MQTT user for the app.
+- The app does nothing to your installation until you have chosen devices. It recognises the installation it
+  was built on by checking the names in the Home Manager, and otherwise only uses what you add yourself.
+- **Don't upload private files.** MRF exports (`Anlagenkonfiguration*.txt`) contain the MRF password in plain
+  text. `.gitignore` stops the most common ones, but always check.
+
+---
+
+## For developers
 
 ```
 xcomfort-ha/
-├── repository.yaml                  App-repo for Home Assistant
-├── verktoy/lag_usb_kart.py          Lager USB-kart fra MRF-eksport + xSetup-backup (valgfritt)
+├── repository.yaml                  App repository for Home Assistant
+├── tools/make_usb_map.py            Builds a USB map from an MRF export + xSetup backup (optional)
 └── xcomfort_bridge/
-    ├── config.yaml                  Versjon, innstillinger, nettside (ingress), USB
-    ├── xcomfort_mqtt_bridge.py      Hovedprogrammet: MQTT, discovery, kommandoer, USB-styring
-    ├── xcomfort_local_control.py    Protokollen mot Home Manager (+ enhetslisten for forfatterens anlegg)
-    ├── hm_link.py                   Lytte-forbindelsen (hurtig status og hurtigvei for kommandoer)
-    ├── usbstick.py                  Direkte radio via USB-pinnen CKOZ-00/13
-    ├── scanner.py                   Søk etter alle objekter i Home Manager
-    ├── idmap.py                     Følger objekter som får nytt nummer
-    ├── web.py, web/index.html       Nettsiden i sidepanelet
-    ├── tests/test_bro.py            Tester mot en falsk Home Manager og en falsk USB-pinne
+    ├── config.yaml                  Version, settings, web page (ingress), USB
+    ├── xcomfort_mqtt_bridge.py      Main program: MQTT, discovery, commands, USB control
+    ├── xcomfort_local_control.py    The Home Manager protocol (+ the device list for the author's house)
+    ├── hm_link.py                   The listener connection (instant status and the fast command path)
+    ├── usbstick.py                  Direct radio through the CKOZ-00/13 USB stick
+    ├── scanner.py                   Searches all objects in the Home Manager
+    ├── idmap.py                     Follows objects that get a new number
+    ├── web.py, web/index.html       The web page in the sidebar
+    ├── translations/                Setting texts (English and Norwegian)
+    ├── tests/test_bro.py            Tests against a fake Home Manager and a fake USB stick
     └── CHANGELOG.md
 ```
 
-### Home Manager-protokollen
+Code comments are mostly in Norwegian.
 
-Ren tekst over TCP port 10023. Hver melding pakkes inn i `0x01` … `0x02`.
+### The Home Manager protocol
 
-| Retning | Melding | Betyr |
+Plain text over TCP port 10023. Every message is wrapped in `0x01` … `0x02`.
+
+| Direction | Message | Meaning |
 |---|---|---|
-| → | `d_obj <id>` | Abonner på et objekt. Home Manager svarer med verdien og sender senere endringer. |
-| ← | `SSN <id> <navn> <type> … <verdi>` | Verdi eller endring |
-| → | `set_value <id> <verdi>` | Sett en verdi, f.eks. lysstyrke 0 til 100 |
-| → | `new_state <id> 0` | Utfør |
+| → | `d_obj <id>` | Subscribe to an object. The Home Manager answers with its value and sends later changes. |
+| ← | `SSN <id> <name> <type> … <value>` | Value or change |
+| → | `set_value <id> <value>` | Set a value, e.g. brightness 0 to 100 |
+| → | `new_state <id> 0` | Execute |
 
-Home Manager sender endringer til **alle** åpne forbindelser.
+The Home Manager sends changes to **all** open connections.
 
-### USB-pinnen
+### The USB stick
 
-HID-enhet `188A:1102`, rammer på 62 bytes: `5A <lengde> <kode> <data> A5`. Radiokommandoer har kode
-`1B` og adresseres direkte på dimmerens serienummer, med CRC-16/Kermit. `50` = på, `51` = av,
-`5A 01 00 <nivå 0-255>` = sett nivå. Dimmeren kvitterer til pinnens adresse (128). Detaljer i
+HID device `188A:1102`, 62 byte frames: `5A <length> <code> <data> A5`. Radio commands use code `1B` and are
+addressed directly to the dimmer's serial number, with CRC-16/Kermit. `50` = on, `51` = off,
+`5A 01 00 <level 0-255>` = set level. The dimmer acknowledges to the stick's address (128). Details in
 [`usbstick.py`](xcomfort_bridge/usbstick.py).
 
-### Hvilket anlegg?
+### Which installation?
 
-Ved første oppstart spør appen Home Manager om navnene på noen kjente objekter. Stemmer de med
-forfatterens anlegg, brukes den innebygde enhetslisten. Ellers starter appen tom. Valget lagres i
-`/data/anlegg.json` (`{"innebygd": false}`) og kan overstyres der.
+At first start the app asks the Home Manager for the names of some known objects. If they match the author's
+installation, the built-in device list is used. Otherwise the app starts empty. The choice is saved in
+`/data/anlegg.json` (`{"innebygd": false}`) and can be overridden there.
 
-### Tester
+### Tests
 
 ```bash
 cd xcomfort_bridge
@@ -404,11 +398,11 @@ pip install paho-mqtt pyusb
 python -m unittest discover -s tests -v
 ```
 
-Testene kjører automatisk på GitHub ved hver opplasting. De trenger ikke et ekte anlegg.
+The tests run automatically on GitHub on every push. They do not need a real installation.
 
 ---
 
 <p align="center">
-  Laget i Norge for et hus med for mange lysbrytere. 💡<br>
-  <sub>Eaton, xComfort og Sensio er varemerker for sine respektive eiere. Dette prosjektet er uavhengig.</sub>
+  Made in Norway for a house with too many light switches. 💡<br>
+  <a href="LICENSE">MIT License</a> · <sub>Eaton, xComfort and Sensio are trademarks of their respective owners. This project is independent.</sub>
 </p>

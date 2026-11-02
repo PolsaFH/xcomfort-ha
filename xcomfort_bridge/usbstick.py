@@ -132,10 +132,10 @@ def ensure_dev_node(sysfs_root="/sys/bus/usb/devices", dev_root="/dev/bus/usb"):
             os.makedirs(os.path.dirname(path), exist_ok=True)
             os.mknod(path, 0o660 | stat.S_IFCHR, os.makedev(major, minor))
             made += 1
-            log.info("Laget %s for USB-pinnen (satt inn etter at appen startet)", path)
+            log.info("Created %s for the USB stick (plugged in after the app started)", path)
         except OSError as e:
-            log.warning("USB-pinnen er satt inn, men appen fikk ikke tilgang til den (%s). "
-                        "Start appen på nytt.", e)
+            log.warning("The USB stick is plugged in, but the app could not access it (%s). "
+                        "Restart the app.", e)
     return made
 
 
@@ -149,7 +149,7 @@ def _fresh_backend():
             return None
         return lb._LibUSB(lb._lib)   # noqa: SLF001
     except Exception as e:  # noqa: BLE001
-        log.debug("Kunne ikke lage ny libusb-sesjon: %s", e)
+        log.debug("Could not create a new libusb session: %s", e)
         return None
 
 
@@ -174,7 +174,7 @@ class PyUsbTransport:
             import usb.core
             import usb.util
         except ImportError:
-            log.info("pyusb er ikke installert -- USB-pinnen brukes ikke")
+            log.info("pyusb is not installed -- the USB stick is not used")
             return None
         ensure_dev_node()
         backend = _fresh_backend()
@@ -187,7 +187,7 @@ class PyUsbTransport:
             if dev.is_kernel_driver_active(0):
                 dev.detach_kernel_driver(0)
         except (NotImplementedError, usb.core.USBError) as e:
-            log.debug("Kunne ikke koble fra kjernedriveren: %s", e)
+            log.debug("Could not detach the kernel driver: %s", e)
         try:
             dev.set_configuration()
         except usb.core.USBError as e:
@@ -200,7 +200,7 @@ class PyUsbTransport:
         ep_out = usb.util.find_descriptor(
             intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
         if ep_in is None or ep_out is None:
-            raise IOError("fant ikke endepunktene på USB-pinnen")
+            raise IOError("could not find the endpoints on the USB stick")
         return cls(dev, ep_in, ep_out)
 
     def write(self, data):
@@ -269,11 +269,11 @@ class UsbStick:
             self.last_error = str(e)
             if not self._logged_open_fail:   # ikke spam loggen hvert 10. sekund
                 self._logged_open_fail = True
-                log.warning("USB-pinnen ble funnet, men kunne ikke åpnes: %s", e)
+                log.warning("The USB stick was found but could not be opened: %s", e)
             return False
         if t is None:
             if not self._logged_missing:
-                log.info("Ingen USB-pinne (CKOZ-00/13) funnet -- lys styres via Home Manager")
+                log.info("No USB stick (CKOZ-00/13) found -- lights are controlled via Home Manager")
                 self._logged_missing = True
             return False
         try:
@@ -291,7 +291,7 @@ class UsbStick:
                         if b"\x00" in data[3:] else "CKOZ"
         except Exception as e:  # noqa: BLE001
             self.last_error = str(e)
-            log.warning("USB-pinnen svarte ikke riktig ved oppstart: %s", e)
+            log.warning("The USB stick did not answer correctly at startup: %s", e)
             t.close()
             return False
         with self.lock:
@@ -301,7 +301,7 @@ class UsbStick:
             self._warned_deaf = False
         self._logged_missing = False
         self._logged_open_fail = False
-        log.info("USB-pinne klar (%s). Lys styres direkte over radio, Home Manager er reserve.",
+        log.info("USB stick ready (%s). Lights are controlled directly over radio, with Home Manager as fallback.",
                  self.name or "CKOZ-00/13")
         return True
 
@@ -319,20 +319,20 @@ class UsbStick:
                 self._read_errors = 0
             except TransientUsbError as e:
                 self._read_errors += 1
-                self.last_error = f"lesefeil: {e}"
+                self.last_error = f"read error: {e}"
                 if self._read_errors >= 20:
-                    self._broken(f"mange lesefeil på rad: {e}")
+                    self._broken(f"many read errors in a row: {e}")
                 continue
             except Exception as e:  # noqa: BLE001
-                self._broken(f"lesefeil: {e}")
+                self._broken(f"read error: {e}")
                 continue
             if data:
                 self.feed(data)
             elif (not self._warned_deaf and self.rx_radio == 0 and self.connected_at
                   and time.time() - self.connected_at > 120):
                 self._warned_deaf = True
-                log.warning("USB-pinnen har ikke hørt noen radiomeldinger på 2 minutter. Kommandoer kan "
-                            "sendes, men kvitteringer kommer ikke fram -- Home Manager brukes til å bekrefte.")
+                log.warning("The USB stick has not heard any radio messages for 2 minutes. Commands can still "
+                            "be sent, but acknowledgements are not received -- Home Manager is used to confirm.")
 
     def feed(self, data):
         if not data:
@@ -349,7 +349,7 @@ class UsbStick:
             return
         self.rx_radio += 1
         if self.rx_radio <= 3:
-            log.info("USB-pinnen hører radio: %s", frame.hex(" "))
+            log.info("The USB stick hears radio: %s", frame.hex(" "))
         _kind, src, dst = info
         if dst == STICK_ADDR:
             self.rx_acks += 1
@@ -360,10 +360,10 @@ class UsbStick:
             try:
                 self.on_radio(frame, info)
             except Exception:  # noqa: BLE001
-                log.exception("Feil i behandling av radiomelding")
+                log.exception("Error while handling a radio message")
 
     def _broken(self, why):
-        log.warning("USB-pinnen sluttet å virke (%s) -- bruker Home Manager til den er tilbake", why)
+        log.warning("The USB stick stopped working (%s) -- using Home Manager until it is back", why)
         self.last_error = why
         with self.lock:
             self.ok = False
@@ -423,7 +423,7 @@ class UsbStick:
                 broken = str(e)
             else:
                 return t0, acked
-        self._broken(f"skrivefeil: {broken}")
+        self._broken(f"write error: {broken}")
         return None
 
     def acked_since(self, serial, t0):

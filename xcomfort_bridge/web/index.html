@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="no">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -197,129 +197,129 @@ dialog .row{margin-top:16px;justify-content:flex-end}
 <div class="top">
   <div class="bar">
     <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 3 2 11h3v9h5v-6h4v6h5v-9h3z"/></svg></div>
-    <div class="title">xComfort<small id="ver">laster …</small></div>
-    <span id="pill" class="pill"><span class="d"></span><span id="pilltx">Kobler til …</span></span>
+    <div class="title">xComfort<small id="ver">loading …</small></div>
+    <span id="pill" class="pill"><span class="d"></span><span id="pilltx">Connecting …</span></span>
   </div>
   <nav class="tabs" id="tabs">
-    <button data-t="hjem" class="on"><svg class="i" viewBox="0 0 24 24"><path d="M12 3 2 11h3v9h5v-6h4v6h5v-9h3z"/></svg>Hjem</button>
-    <button data-t="rom"><svg class="i" viewBox="0 0 24 24"><path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>Rom</button>
-    <button data-t="knapper"><svg class="i" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>Knapper <span id="nybadge" class="badge" hidden></span></button>
-    <button data-t="enheter"><svg class="i" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>Enheter</button>
-    <button data-t="usb"><svg class="i" viewBox="0 0 24 24"><path d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.1A2 2 0 1 0 6 11v2a2 2 0 0 0 2 2h3v3.1a2.5 2.5 0 1 0 2 0V15h3a2 2 0 0 0 2-2v-2h1V7z"/></svg>USB-pinne</button>
-    <button data-t="logg"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h10v2H4z"/></svg>Logg</button>
+    <button data-t="home" class="on"><svg class="i" viewBox="0 0 24 24"><path d="M12 3 2 11h3v9h5v-6h4v6h5v-9h3z"/></svg>Home</button>
+    <button data-t="rooms"><svg class="i" viewBox="0 0 24 24"><path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>Rooms</button>
+    <button data-t="buttons"><svg class="i" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>Buttons <span id="nybadge" class="badge" hidden></span></button>
+    <button data-t="devices"><svg class="i" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>Devices</button>
+    <button data-t="usb"><svg class="i" viewBox="0 0 24 24"><path d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.1A2 2 0 1 0 6 11v2a2 2 0 0 0 2 2h3v3.1a2.5 2.5 0 1 0 2 0V15h3a2 2 0 0 0 2-2v-2h1V7z"/></svg>USB stick</button>
+    <button data-t="log"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h10v2H4z"/></svg>Log</button>
   </nav>
 </div>
 
 <main>
-<!-- HJEM -->
-<section id="hjem">
+<!-- HOME -->
+<section id="home">
   <div id="welcome"></div>
-  <div class="card hero" id="hero"><div class="big-i" id="heroi"></div><div><h1 id="herot">Kobler til …</h1><p id="herop"></p></div></div>
+  <div class="card hero" id="hero"><div class="big-i" id="heroi"></div><div><h1 id="herot">Connecting …</h1><p id="herop"></p></div></div>
   <div class="grid g4 mt" id="kpis"></div>
   <div class="grid g2 mt">
-    <div class="card"><h2>Hva skjer i huset <span class="sub">oppdateres med en gang</span></h2><div class="feed" id="feed"><div class="empty">Ingenting ennå. Trykk på en bryter, så dukker det opp her.</div></div></div>
+    <div class="card"><h2>What is happening <span class="sub">updates instantly</span></h2><div class="feed" id="feed"><div class="empty">Nothing yet. Press a switch and it shows up here.</div></div></div>
     <div class="grid" style="align-content:start">
-      <div class="card" id="blindcard" hidden><h2>Markiser</h2><div id="blinds"></div></div>
-      <div class="card"><h2>Responstid lys <span class="sub">fra kommando til lampa svarer</span></h2><div id="chart"></div></div>
+      <div class="card" id="blindcard" hidden><h2>Awnings</h2><div id="blinds"></div></div>
+      <div class="card"><h2>Light response time <span class="sub">from command until the lamp answers</span></h2><div id="chart"></div></div>
     </div>
   </div>
 </section>
 
-<!-- ROM -->
-<section id="rom" hidden>
+<!-- ROOMS -->
+<section id="rooms" hidden>
   <div class="toolbar">
-    <input id="romsok" type="search" placeholder="Søk etter lys, bryter eller rom …">
+    <input id="romsok" type="search" placeholder="Search lights, switches or rooms …">
     <div class="seg" id="typer">
-      <button data-v="" class="on">Alt</button><button data-v="lys">Lys</button><button data-v="bryter">Brytere</button><button data-v="markise">Markiser</button><button data-v="termostat">Varme</button>
+      <button data-v="" class="on">All</button><button data-v="lys">Lights</button><button data-v="bryter">Switches</button><button data-v="markise">Awnings</button><button data-v="termostat">Heating</button>
     </div>
-    <label class="small muted row" style="gap:6px"><input type="checkbox" id="baretpa"> Bare det som er på</label>
+    <label class="small muted row" style="gap:6px"><input type="checkbox" id="baretpa"> Only what is on</label>
   </div>
   <div class="chips" id="romchips" style="margin-bottom:14px"></div>
   <div id="rooms"></div>
 </section>
 
-<!-- KNAPPER -->
-<section id="knapper" hidden>
+<!-- BUTTONS -->
+<section id="buttons" hidden>
   <div id="nyknapper"></div>
-  <div class="card"><h2>Knapper i Home Assistant <span class="sub">lyser opp når noen trykker</span></h2><div id="btnlist"></div></div>
-  <div class="card mt"><h2>Slik bruker du knappene i automasjoner</h2>
-    <p class="muted">Hver knapp er en hendelses-enhet i Home Assistant. Lag en automasjon med utløseren <b>Enhet</b> eller <b>Tilstand</b> på knappen, og velg hvilken type trykk:</p>
+  <div class="card"><h2>Buttons in Home Assistant <span class="sub">light up when pressed</span></h2><div id="btnlist"></div></div>
+  <div class="card mt"><h2>Using the buttons in automations</h2>
+    <p class="muted">Each button is an event entity in Home Assistant. Create an automation with the <b>Event received</b> trigger on the button and choose the type of press:</p>
     <div class="legend">
-      <div><span class="tag">kort_opp</span><br><span class="muted">kort trykk opp</span></div>
-      <div><span class="tag">kort_ned</span><br><span class="muted">kort trykk ned</span></div>
-      <div><span class="tag">langt_opp</span><br><span class="muted">holder inne opp</span></div>
-      <div><span class="tag">langt_opp_slipp</span><br><span class="muted">slipper etter langt opp</span></div>
-      <div><span class="tag">langt_ned</span><br><span class="muted">holder inne ned</span></div>
-      <div><span class="tag">langt_ned_slipp</span><br><span class="muted">slipper etter langt ned</span></div>
+      <div><span class="tag">short_up</span><br><span class="muted">short press up</span></div>
+      <div><span class="tag">short_down</span><br><span class="muted">short press down</span></div>
+      <div><span class="tag">long_up</span><br><span class="muted">holding up</span></div>
+      <div><span class="tag">long_up_release</span><br><span class="muted">released after holding up</span></div>
+      <div><span class="tag">long_down</span><br><span class="muted">holding down</span></div>
+      <div><span class="tag">long_down_release</span><br><span class="muted">released after holding down</span></div>
     </div>
   </div>
 </section>
 
-<!-- ENHETER -->
-<section id="enheter" hidden>
-  <div class="card"><h2><svg class="i" viewBox="0 0 24 24"><path d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 9.5 16a6.5 6.5 0 0 0 4.2-1.6l.3.3v.8l5 5 1.5-1.5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>1. Søk etter enheter i Home Manager</h2>
-    <p class="muted">Appen går gjennom alt Home Manager har og finner dimbare lys, av/på-brytere og knapper. Det tar 10–20 minutter og påvirker ikke radioen, så du kan lukke siden imens. Kjør det på nytt etter endringer i MRF eller xSetup.</p>
+<!-- DEVICES -->
+<section id="devices" hidden>
+  <div class="card"><h2><svg class="i" viewBox="0 0 24 24"><path d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 9.5 16a6.5 6.5 0 0 0 4.2-1.6l.3.3v.8l5 5 1.5-1.5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>1. Search the Home Manager</h2>
+    <p class="muted">The app goes through everything in the Home Manager and finds dimmable lights, on/off switches and buttons. It takes 10 to 20 minutes and does not affect the radio, so you can close the page meanwhile. Run it again after changes in MRF or xSetup.</p>
     <div id="scanstat"></div>
   </div>
-  <div class="card mt" id="kandcard"><h2><svg class="i" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>2. Velg hva som skal inn i Home Assistant</h2>
-    <p class="muted">Gi hver enhet et navn og et rom. Rommet blir en egen enhet i Home Assistant, så lysene havner pent sortert. Du kan endre navn og rom senere med blyanten under <b>Rom</b>.</p>
+  <div class="card mt" id="kandcard"><h2><svg class="i" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>2. Choose what goes into Home Assistant</h2>
+    <p class="muted">Give each device a name and a room. Each room becomes a device in Home Assistant, so everything ends up neatly sorted. You can change the name and room later with the pencil under <b>Rooms</b>.</p>
     <div id="kand"></div>
   </div>
   <div class="grid g2 mt">
-    <div class="card"><h2>Finn et objekt i Home Manager</h2>
-      <input id="objsok" type="search" placeholder="Navn eller nummer, f.eks. «stue» eller «BR» …" style="width:100%">
+    <div class="card"><h2>Find an object in the Home Manager</h2>
+      <input id="objsok" type="search" placeholder="Name or number, e.g. «kitchen» or «BR» …" style="width:100%">
       <div id="objres" style="margin-top:10px"></div>
     </div>
-    <div class="card"><h2>Sikkerhetskopi</h2>
-      <p class="muted">Last ned det appen vet om anlegget ditt. Fint å ha før du endrer noe i xSetup eller MRF.</p>
-      <div class="row"><a class="btn" href="api/cache" download="xcomfort_object_cache.json">Styre-objekter</a><a class="btn" href="api/scan/all" download="hm_objekter.json">Alle objekter</a></div>
+    <div class="card"><h2>Backup</h2>
+      <p class="muted">Download what the app knows about your installation. Good to have before you change anything in xSetup or MRF.</p>
+      <div class="row"><a class="btn" href="api/cache" download="xcomfort_object_cache.json">Control objects</a><a class="btn" href="api/scan/all" download="hm_objects.json">All objects</a></div>
     </div>
   </div>
 </section>
 
 <!-- USB -->
 <section id="usb" hidden>
-  <div class="card"><h2><svg class="i" viewBox="0 0 24 24"><path d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.1A2 2 0 1 0 6 11v2a2 2 0 0 0 2 2h3v3.1a2.5 2.5 0 1 0 2 0V15h3a2 2 0 0 0 2-2v-2h1V7z"/></svg>USB-pinne <span class="sub">valgfritt</span></h2>
-    <p class="muted">Sett xComfort-pinnen <b>CKOZ-00/13</b> (den samme som MRF bruker) i maskinen som kjører Home Assistant. Da sendes lyskommandoer rett ut på radio, og lysene reagerer med en gang. Svarer ikke en dimmer, tar Home Manager over av seg selv.</p>
+  <div class="card"><h2><svg class="i" viewBox="0 0 24 24"><path d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.1A2 2 0 1 0 6 11v2a2 2 0 0 0 2 2h3v3.1a2.5 2.5 0 1 0 2 0V15h3a2 2 0 0 0 2-2v-2h1V7z"/></svg>USB stick <span class="sub">optional</span></h2>
+    <p class="muted">Plug the xComfort stick <b>CKOZ-00/13</b> (the one MRF uses) into the machine that runs Home Assistant. Light commands are then sent straight out over radio, and the lights react instantly. If a dimmer does not answer, the Home Manager takes over automatically.</p>
     <div id="usbstat"></div>
   </div>
-  <div class="card mt"><h2>USB-kart <span class="sub">hvilke dimmere hvert lys styrer</span></h2>
-    <p class="muted">Pinnen må vite radio-serienumrene til dimmerne bak hvert lys. Appen kan finne dem selv: den sender en kommando via Home Manager til ett lys om gangen og lytter på hvilke dimmere som får den. Lysene endrer seg ikke synlig. Tar omtrent 10 sekunder per lys.</p>
+  <div class="card mt"><h2>USB map <span class="sub">which dimmers each light controls</span></h2>
+    <p class="muted">The stick needs the radio serial numbers of the dimmers behind each light. The app can find them itself: it sends a command through the Home Manager to one light at a time and listens for which dimmers receive it. The lights do not visibly change. Takes about 10 seconds per light.</p>
     <div id="usblearn"></div>
-    <details class="sub"><summary>Vis kartet</summary><div id="usbkart" style="margin-top:10px"></div></details>
-    <details class="sub"><summary>Last opp et kart fra fil</summary>
-      <p class="small muted">For deg som har laget kartet selv, f.eks. med <span class="tag">verktoy/lag_usb_kart.py</span> fra MRF-eksporten.</p>
-      <label class="btn" style="cursor:pointer">Velg fil (.json)<input type="file" id="usbfil" accept=".json,application/json" hidden></label>
+    <details class="sub"><summary>Show the map</summary><div id="usbkart" style="margin-top:10px"></div></details>
+    <details class="sub"><summary>Upload a map from a file</summary>
+      <p class="small muted">For those who made the map themselves, e.g. with <span class="tag">tools/make_usb_map.py</span> from the MRF export.</p>
+      <label class="btn" style="cursor:pointer">Choose file (.json)<input type="file" id="usbfil" accept=".json,application/json" hidden></label>
     </details>
   </div>
-  <div class="card mt"><h2>Feilsøking</h2>
-    <details class="sub" style="border:0;padding:0;margin:0" id="usbframes"><summary>Hva pinnen hører</summary><pre class="small mono" id="usbraw" style="white-space:pre-wrap;margin:8px 0 0"></pre></details>
-    <details class="sub" id="usbradio"><summary>Radiomeldinger til og fra dimmerne</summary><p class="small muted">Hva Home Manager sender til hver dimmer og hva dimmerne svarer, sammen med siste kommando fra HA.</p><div id="usbradiotab"></div></details>
+  <div class="card mt"><h2>Troubleshooting</h2>
+    <details class="sub" style="border:0;padding:0;margin:0" id="usbframes"><summary>What the stick hears</summary><pre class="small mono" id="usbraw" style="white-space:pre-wrap;margin:8px 0 0"></pre></details>
+    <details class="sub" id="usbradio"><summary>Radio messages to and from the dimmers</summary><p class="small muted">What the Home Manager sends to each dimmer and what the dimmers answer, together with the last command from HA.</p><div id="usbradiotab"></div></details>
   </div>
 </section>
 
-<!-- LOGG -->
-<section id="logg" hidden>
+<!-- LOG -->
+<section id="log" hidden>
   <div class="toolbar">
-    <input id="logsok" type="search" placeholder="Filtrer loggen …">
-    <div class="seg" id="lognivaa"><button data-v="" class="on">Alt</button><button data-v="INFO">Info</button><button data-v="WARN">Advarsler og feil</button></div>
+    <input id="logsok" type="search" placeholder="Filter the log …">
+    <div class="seg" id="lognivaa"><button data-v="" class="on">All</button><button data-v="INFO">Info</button><button data-v="WARN">Warnings and errors</button></div>
     <button class="btn" id="logpause">Pause</button>
-    <button class="btn ghost" id="logtom">Tøm visning</button>
-    <button class="btn ghost" id="loglast">Last ned</button>
+    <button class="btn ghost" id="logtom">Clear view</button>
+    <button class="btn ghost" id="loglast">Download</button>
   </div>
   <div class="logwrap" id="logwrap"><div id="logbox"></div></div>
-  <details class="card mt" id="rawdet"><summary><svg class="i" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Rå trafikk fra Home Manager <span class="muted small" style="font-weight:400">for feilsøking</span></summary>
-    <div class="toolbar"><input id="rawsok" type="search" placeholder="Filtrer, f.eks. et objektnummer …"><button class="btn" id="rawpause">Pause</button></div>
+  <details class="card mt" id="rawdet"><summary><svg class="i" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Raw traffic from the Home Manager <span class="muted small" style="font-weight:400">for troubleshooting</span></summary>
+    <div class="toolbar"><input id="rawsok" type="search" placeholder="Filter, e.g. an object number …"><button class="btn" id="rawpause">Pause</button></div>
     <div class="raw" id="rawbox"></div>
   </details>
 </section>
 </main>
 
 <dialog id="editdlg">
-  <h3 id="edittitle">Endre</h3>
-  <label for="editnavn">Navn</label><input type="text" id="editnavn">
-  <label for="editsone">Rom</label><input type="text" id="editsone" list="romliste">
-  <div class="row"><button class="btn ghost danger" id="editrm" style="margin-right:auto">Fjern fra HA</button><button class="btn" id="editavbryt">Avbryt</button><button class="btn pri" id="editlagre">Lagre</button></div>
+  <h3 id="edittitle">Edit</h3>
+  <label for="editnavn">Name</label><input type="text" id="editnavn">
+  <label for="editsone">Room</label><input type="text" id="editsone" list="romliste">
+  <div class="row"><button class="btn ghost danger" id="editrm" style="margin-right:auto">Remove from HA</button><button class="btn" id="editavbryt">Cancel</button><button class="btn pri" id="editlagre">Save</button></div>
 </dialog>
 <datalist id="romliste"></datalist>
 <div id="toasts"></div>
@@ -347,14 +347,15 @@ const I={
 };
 const ic=(n,c="i")=>`<svg class="${c}" viewBox="0 0 24 24">${I[n]}</svg>`;
 const KIND_IC={lys:"bulb",bryter:"power",markise:"blind",termostat:"thermo",knapp:"btn",alarm:"alert"};
-function ago(sec){if(sec==null)return"";if(sec<5)return"akkurat nå";if(sec<60)return sec+" s siden";if(sec<3600)return Math.round(sec/60)+" min siden";if(sec<86400)return Math.round(sec/3600)+" t siden";return Math.round(sec/86400)+" d siden"}
-function dur(sec){const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);return d?`${d} d ${h} t`:h?`${h} t ${m} min`:`${m} min`}
+function ago(sec){if(sec==null)return"";if(sec<5)return"just now";if(sec<60)return sec+" s ago";if(sec<3600)return Math.round(sec/60)+" min ago";if(sec<86400)return Math.round(sec/3600)+" h ago";return Math.round(sec/86400)+" d ago"}
+function dur(sec){const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);return d?`${d} d ${h} h`:h?`${h} h ${m} min`:`${m} min`}
 function toast(t,err){const e=document.createElement("div");e.className="toast"+(err?" err":"");e.textContent=t;$("#toasts").append(e);setTimeout(()=>e.remove(),3200)}
-async function cmd(type,id,value,label){try{const r=await post("api/cmd",{type,id,value});if(r.ok===false)throw new Error(r.feil);if(label)toast(label)}catch(e){toast("Kunne ikke sende: "+e.message,true)}}
+async function cmd(type,id,value,label){try{const r=await post("api/cmd",{type,id,value});if(r.ok===false)throw new Error(r.feil);if(label)toast(label)}catch(e){toast("Could not send: "+e.message,true)}}
+const MK={ut:"extend",inn:"retract",stopp:"stop"};
 const stat=(v,l)=>`<div class="stat"><b>${v}</b><span>${l}</span></div>`;
 
 /* ---------- faner ---------- */
-let tab=(location.hash||"#hjem").slice(1);if(!$("#"+tab))tab="hjem";
+let tab=(location.hash||"#home").slice(1);if(!$("#"+tab))tab="home";
 function show(t){tab=t;location.hash=t;$$("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));$$("main>section").forEach(s=>s.hidden=s.id!==t);tick(true)}
 $$("#tabs button").forEach(b=>b.onclick=()=>show(b.dataset.t));
 window.addEventListener("hashchange",()=>{const t=location.hash.slice(1);if(t!==tab&&$("#"+t))show(t)});
@@ -363,12 +364,12 @@ window.addEventListener("hashchange",()=>{const t=location.hash.slice(1);if(t!==
 let S=null,DEVS=[];
 async function loadStatus(){
   S=await api("api/status");
-  $("#ver").textContent="v"+S.versjon+" · oppe i "+dur(S.oppetid_sek);
+  $("#ver").textContent="v"+S.versjon+" · up "+dur(S.oppetid_sek);
   const prob=S.problemer||[];let cls,txt,h1,p,icn;
-  if(!S.mqtt){cls="err";txt="Ikke koblet til HA";h1="Ikke koblet til Home Assistant";p="Appen får ikke kontakt med MQTT-megleren ("+esc(S.mqtt_host)+"). Sjekk at Mosquitto kjører, og at brukernavn og passord i appens Konfigurasjon stemmer.";icn="off"}
-  else if(prob.length){cls="warn";txt=prob.length+" problem";h1="Noe trenger oppmerksomhet";p=prob.map(esc).join(" · ");icn="alert"}
-  else if(!S.lytter_ok){cls="warn";txt="Treg status";h1="Kontakt med Home Manager, men uten direktelinje";p="Status hentes "+(S.poll_modus==="vanlig"?"jevnlig":esc(S.poll_modus))+". Den direkte forbindelsen prøver å koble til igjen av seg selv.";icn="alert"}
-  else{cls="ok";txt="Alt fungerer";h1="Alt fungerer";p="Direkte forbindelse til Home Manager. Endringer i huset vises med en gang. Siste melding "+ago(S.siste_melding_sek)+".";icn="ok"}
+  if(!S.mqtt){cls="err";txt="Not connected to HA";h1="Not connected to Home Assistant";p="The app cannot reach the MQTT broker ("+esc(S.mqtt_host)+"). Check that Mosquitto is running, and that the username and password in the app's Configuration are correct.";icn="off"}
+  else if(prob.length){cls="warn";txt=prob.length+(prob.length>1?" problems":" problem");h1="Something needs attention";p=prob.map(esc).join(" · ");icn="alert"}
+  else if(!S.lytter_ok){cls="warn";txt="Slow status";h1="Connected to the Home Manager, but without a live connection";p="Status is read "+esc(S.poll_modus)+". The live connection reconnects by itself.";icn="alert"}
+  else{cls="ok";txt="All good";h1="Everything is working";p="Live connection to the Home Manager. Changes in the house show up instantly. Last message "+ago(S.siste_melding_sek)+".";icn="ok"}
   $("#pill").className="pill "+cls;$("#pilltx").textContent=txt;
   $("#hero").className="card hero "+cls;$("#heroi").innerHTML=ic(icn);$("#herot").textContent=h1;$("#herop").innerHTML=p;
 }
@@ -377,14 +378,14 @@ function renderWelcome(){
   const a=S.antall,total=a.lys+a.brytere+a.knapper+a.markiser+a.termostater;
   if(total>0){$("#welcome").innerHTML="";return}
   const scanned=scanInfo&&scanInfo.status&&scanInfo.status.objects>0;
-  $("#welcome").innerHTML=`<div class="card welcome" style="margin-bottom:14px"><h2>Velkommen! La oss finne lysene dine</h2>
-   <p class="muted">Appen er koblet til, men vet ennå ikke hva som finnes i anlegget ditt. Det fikser du på et par minutter:</p>
+  $("#welcome").innerHTML=`<div class="card welcome" style="margin-bottom:14px"><h2>Welcome! Let's find your lights</h2>
+   <p class="muted">The app is connected, but does not know what your installation contains yet. That takes a couple of minutes:</p>
    <div class="steps">
-    <div class="step ${S.lytter_ok||S.siste_melding_sek!=null?"done":""}"><div class="n">1</div><div><b>Koble til</b><div class="small muted">Home Manager og MQTT. ${S.mqtt?"Ferdig.":"Venter på MQTT …"}</div></div></div>
-    <div class="step ${scanned?"done":""}"><div class="n">2</div><div><b>Søk</b><div class="small muted">Finn alt som finnes i Home Manager (10–20 min).</div></div></div>
-    <div class="step"><div class="n">3</div><div><b>Velg</b><div class="small muted">Gi lys, brytere og knapper navn og rom.</div></div></div>
+    <div class="step ${S.lytter_ok||S.siste_melding_sek!=null?"done":""}"><div class="n">1</div><div><b>Connect</b><div class="small muted">Home Manager and MQTT. ${S.mqtt?"Done.":"Waiting for MQTT …"}</div></div></div>
+    <div class="step ${scanned?"done":""}"><div class="n">2</div><div><b>Search</b><div class="small muted">Find everything in the Home Manager (10 to 20 min).</div></div></div>
+    <div class="step"><div class="n">3</div><div><b>Choose</b><div class="small muted">Give lights, switches and buttons a name and a room.</div></div></div>
    </div>
-   <button class="btn pri mt" onclick="show('enheter')">Gå til Enheter</button></div>`;
+   <button class="btn pri mt" onclick="show('devices')">Go to Devices</button></div>`;
 }
 function renderHome(){
   if(!S)return;
@@ -392,22 +393,22 @@ function renderHome(){
   const lys=DEVS.filter(d=>d.type==="lys"),on=lys.filter(d=>d.på).length;
   const resp=S.snitt_respons!=null?S.snitt_respons.toFixed(1)+" <small>s</small>":"–";
   $("#kpis").innerHTML=
-    kpi("bulb","Lys på",`${on} <small>av ${lys.length||S.antall.lys}</small>`,on?"se hvilke under Rom":"alt er av")+
-    kpi("speed","Responstid",resp,S.bekreftet?`snitt av ${S.bekreftet} målinger`:"skru et lys av/på fra HA")+
-    kpi("cmd","Kommandoer",S.sendt,S.feilet?`<span style="color:var(--err)">${S.feilet} feilet</span>`:"ingen feil")+
-    kpi("radio","USB-pinne",S.usb.tilkoblet?"Tilkoblet":S.usb.aktivert?"Ikke funnet":"Av",S.usb.tilkoblet?`${S.usb.lys_med_kart} lys styres direkte`:"lys går via Home Manager");
+    kpi("bulb","Lights on",`${on} <small>of ${lys.length||S.antall.lys}</small>`,on?"see which under Rooms":"everything is off")+
+    kpi("speed","Response time",resp,S.bekreftet?`average of ${S.bekreftet} measurements`:"turn a light on or off from HA")+
+    kpi("cmd","Commands",S.sendt,S.feilet?`<span style="color:var(--err)">${S.feilet} failed</span>`:"no errors")+
+    kpi("radio","USB stick",S.usb.tilkoblet?"Connected":S.usb.aktivert?"Not found":"Off",S.usb.tilkoblet?`${S.usb.lys_med_kart} lights controlled directly`:"lights go through the Home Manager");
   $("#blindcard").hidden=!S.markiser.length;
   $("#blinds").innerHTML=S.markiser.map(m=>{
-    const mv=m.tilstand==="opening"?"kjører ut":m.tilstand==="closing"?"kjører inn":"";
-    return `<div class="blind"><div class="hd">${ic("blind")}<b>${esc(m.navn)}</b>${mv?`<span class="moving">${mv}</span>`:""}<span class="muted">${m.posisjon} % ute</span></div>
+    const mv=m.tilstand==="opening"?"extending":m.tilstand==="closing"?"retracting":"";
+    return `<div class="blind"><div class="hd">${ic("blind")}<b>${esc(m.navn)}</b>${mv?`<span class="moving">${mv}</span>`:""}<span class="muted">${m.posisjon} % out</span></div>
     <div class="track"><div style="width:${m.posisjon}%"></div></div>
-    <div class="ctl"><button class="btn" data-mk="${m.id}:inn">Inn</button><button class="btn" data-mk="${m.id}:stopp">Stopp</button><button class="btn" data-mk="${m.id}:ut">Ut</button></div></div>`}).join("");
-  $$("#blinds [data-mk]").forEach(b=>b.onclick=()=>{const[id,a]=b.dataset.mk.split(":");cmd("markise",+id,a,"Sendt: "+a)});
+    <div class="ctl"><button class="btn" data-mk="${m.id}:inn">Retract</button><button class="btn" data-mk="${m.id}:stopp">Stop</button><button class="btn" data-mk="${m.id}:ut">Extend</button></div></div>`}).join("");
+  $$("#blinds [data-mk]").forEach(b=>b.onclick=()=>{const[id,a]=b.dataset.mk.split(":");cmd("markise",+id,a,"Sent: "+MK[a])});
   const r=(S.responstider||[]).slice(-24);
-  if(!r.length){$("#chart").innerHTML='<div class="empty">Ingen målinger ennå. Skru et lys av eller på fra Home Assistant.</div>';}
+  if(!r.length){$("#chart").innerHTML='<div class="empty">No measurements yet. Turn a light on or off from Home Assistant.</div>';}
   else{const mx=Math.max(3,...r.map(x=>x.sek));
     $("#chart").innerHTML=`<div class="chart">${r.map(x=>`<div class="c ${x.sek>3?"slow":""}" style="height:${Math.max(3,x.sek/mx*100)}%" title="${esc(x.navn)}: ${x.sek.toFixed(1)} s (${esc(x.tid)})"></div>`).join("")}</div>
-    <div class="small muted" style="display:flex;justify-content:space-between;margin-top:6px"><span>eldst</span><span>oransje = over 3 s</span><span>nyest</span></div>`}
+    <div class="small muted" style="display:flex;justify-content:space-between;margin-top:6px"><span>oldest</span><span>orange = over 3 s</span><span>newest</span></div>`}
 }
 
 /* ---------- hendelser ---------- */
@@ -420,7 +421,7 @@ async function loadEvents(){
 }
 function renderFeed(){
   if(!evList.length)return;
-  $("#feed").innerHTML=evList.map(e=>{const tm=new Date(e.ts*1000).toLocaleTimeString("no-NO",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  $("#feed").innerHTML=evList.map(e=>{const tm=new Date(e.ts*1000).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
     return `<div class="ev ${esc(e.l)} ${e.fresh?"new":""}"><div class="ic">${ic(KIND_IC[e.l]||"info")}</div><div class="tx">${esc(e.t)}</div><div class="tm">${esc(tm)}</div></div>`}).join("");
   evList.forEach(e=>e.fresh=false);
 }
@@ -429,94 +430,94 @@ function renderFeed(){
 let romFilter="",typeFilter="";
 const zonesOf=()=>[...new Set(DEVS.map(d=>d.sone))].sort((a,b)=>a.localeCompare(b,"no"));
 async function loadDevices(){DEVS=await api("api/devices");$("#romliste").innerHTML=zonesOf().map(z=>`<option value="${esc(z)}">`).join("");
-  if(tab==="rom")renderRooms();if(tab==="knapper")renderButtons();if(tab==="hjem")renderHome()}
+  if(tab==="rooms")renderRooms();if(tab==="buttons")renderButtons();if(tab==="home")renderHome()}
 $("#romsok").oninput=renderRooms;$("#baretpa").onchange=renderRooms;
 $$("#typer button").forEach(b=>b.onclick=()=>{typeFilter=b.dataset.v;$$("#typer button").forEach(x=>x.classList.toggle("on",x===b));renderRooms()});
 function tileHTML(d){
   const k=d.type;let body="",st=esc(d.tilstand);
-  if(k==="lys"){const pct=d.på?parseInt(d.tilstand)||100:0;st=d.på?pct+" %":"av";
-    body=`<input type="range" min="0" max="100" step="5" value="${pct}" data-dim="${d.id}" aria-label="Lysstyrke ${esc(d.navn)}">`}
-  if(k==="markise"){const mv=d.bevegelse==="opening"?" · kjører ut":d.bevegelse==="closing"?" · kjører inn":"";st=(d.posisjon||0)+" % ute"+mv;
-    body=`<div class="track"><div style="width:${d.posisjon||0}%"></div></div><div class="row3"><button class="btn" data-mk="${d.id}:inn">Inn</button><button class="btn" data-mk="${d.id}:stopp">Stopp</button><button class="btn" data-mk="${d.id}:ut">Ut</button></div>`}
-  if(k==="termostat")st=d.temp?`<b style="color:var(--fg);font-size:15px">${esc(d.temp)} °C</b> · mål ${esc(d.mal)} °C`:"venter på avlesning";
+  if(k==="lys"){const pct=d.på?parseInt(d.tilstand)||100:0;st=d.på?pct+" %":"off";
+    body=`<input type="range" min="0" max="100" step="5" value="${pct}" data-dim="${d.id}" aria-label="Brightness ${esc(d.navn)}">`}
+  if(k==="markise"){const mv=d.bevegelse==="opening"?" · extending":d.bevegelse==="closing"?" · retracting":"";st=(d.posisjon||0)+" % out"+mv;
+    body=`<div class="track"><div style="width:${d.posisjon||0}%"></div></div><div class="row3"><button class="btn" data-mk="${d.id}:inn">Retract</button><button class="btn" data-mk="${d.id}:stopp">Stop</button><button class="btn" data-mk="${d.id}:ut">Extend</button></div>`}
+  if(k==="termostat")st=d.temp?`<b style="color:var(--fg);font-size:15px">${esc(d.temp)} °C</b> · target ${esc(d.mal)} °C`:"waiting for a reading";
   const click=k==="lys"||k==="bryter";
-  const edit=d.ekstra?`<button class="btn icon edit" data-edit="${d.id}" title="Endre navn eller rom">${ic("pen")}</button>`:"";
-  return `<div class="tile ${d.på?"on":""} ${click?"":"static"}">${edit}<button class="top" ${click?`data-tg="${k}:${d.id}:${d.på?1:0}"`:""} title="${click?"Trykk for av/på":""}"><div class="ic">${ic(KIND_IC[k]||"info")}</div><div><div class="nm">${esc(d.navn)}</div><div class="st">${st}</div></div></button>${body}</div>`;
+  const edit=d.ekstra?`<button class="btn icon edit" data-edit="${d.id}" title="Change name or room">${ic("pen")}</button>`:"";
+  return `<div class="tile ${d.på?"on":""} ${click?"":"static"}">${edit}<button class="top" ${click?`data-tg="${k}:${d.id}:${d.på?1:0}"`:""} title="${click?"Click to turn on or off":""}"><div class="ic">${ic(KIND_IC[k]||"info")}</div><div><div class="nm">${esc(d.navn)}</div><div class="st">${st}</div></div></button>${body}</div>`;
 }
 function renderRooms(){
   const q=($("#romsok").value||"").toLowerCase(),onlyOn=$("#baretpa").checked;
   const all=DEVS.filter(d=>d.type!=="knapp");
-  if(!all.length){$("#romchips").innerHTML="";$("#rooms").innerHTML=`<div class="card empty">Ingen enheter ennå. <a href="#enheter" onclick="show('enheter');return false">Legg til enheter</a> først.</div>`;return}
+  if(!all.length){$("#romchips").innerHTML="";$("#rooms").innerHTML=`<div class="card empty">No devices yet. <a href="#devices" onclick="show('devices');return false">Add devices</a> first.</div>`;return}
   const devs=all.filter(d=>(!typeFilter||d.type===typeFilter)&&(!onlyOn||d.på)&&(!q||(d.navn+" "+d.sone).toLowerCase().includes(q)));
   const zones={};devs.forEach(d=>(zones[d.sone]=zones[d.sone]||[]).push(d));
   const names=Object.keys(zones).sort((a,b)=>a.localeCompare(b,"no"));
   const allZones=[...new Set(all.map(d=>d.sone))].sort((a,b)=>a.localeCompare(b,"no"));
-  $("#romchips").innerHTML=`<button class="chip ${romFilter?"":"on"}" data-z="">Alle rom</button>`+allZones.map(z=>`<button class="chip ${romFilter===z?"on":""}" data-z="${esc(z)}">${esc(z)}</button>`).join("");
+  $("#romchips").innerHTML=`<button class="chip ${romFilter?"":"on"}" data-z="">All rooms</button>`+allZones.map(z=>`<button class="chip ${romFilter===z?"on":""}" data-z="${esc(z)}">${esc(z)}</button>`).join("");
   $$("#romchips .chip").forEach(c=>c.onclick=()=>{romFilter=c.dataset.z;renderRooms()});
   const shown=names.filter(z=>!romFilter||z===romFilter);
   $("#rooms").innerHTML=shown.map(z=>{const ds=zones[z],onLys=ds.filter(d=>(d.type==="lys"||d.type==="bryter")&&d.på);
-    return `<div class="room"><div class="room-hd"><h3>${esc(z)}</h3><span class="cnt">${onLys.length?onLys.length+" på":"alt av"}</span>${onLys.length?`<button class="btn ghost" data-alloff="${esc(z)}">Slå av alt</button>`:""}</div><div class="tiles">${ds.map(tileHTML).join("")}</div></div>`}).join("")||'<div class="card empty">Ingen treff.</div>';
+    return `<div class="room"><div class="room-hd"><h3>${esc(z)}</h3><span class="cnt">${onLys.length?onLys.length+" on":"all off"}</span>${onLys.length?`<button class="btn ghost" data-alloff="${esc(z)}">Turn all off</button>`:""}</div><div class="tiles">${ds.map(tileHTML).join("")}</div></div>`}).join("")||'<div class="card empty">No matches.</div>';
   $$("[data-tg]").forEach(b=>b.onclick=()=>{const[k,id,on]=b.dataset.tg.split(":");b.closest(".tile").classList.toggle("on",on!=="1");
     if(k==="lys")cmd("lys",+id,on==="1"?0:100);else cmd("bryter",+id,on==="1"?"OFF":"ON");setTimeout(loadDevices,1500)});
   $$("[data-dim]").forEach(r=>{r.oninput=()=>{r.closest(".tile").querySelector(".st").textContent=r.value>0?r.value+" %":"av"};
     r.onchange=()=>{cmd("lys",+r.dataset.dim,+r.value);setTimeout(loadDevices,1500)}});
-  $$("#rooms [data-mk]").forEach(b=>b.onclick=()=>{const[id,a]=b.dataset.mk.split(":");cmd("markise",+id,a,"Sendt: "+a)});
+  $$("#rooms [data-mk]").forEach(b=>b.onclick=()=>{const[id,a]=b.dataset.mk.split(":");cmd("markise",+id,a,"Sent: "+MK[a])});
   $$("#rooms [data-edit]").forEach(b=>b.onclick=()=>openEdit(+b.dataset.edit));
-  $$("[data-alloff]").forEach(b=>b.onclick=()=>{const z=b.dataset.alloff;DEVS.filter(d=>d.sone===z&&d.på).forEach(d=>{if(d.type==="lys")cmd("lys",d.id,0);if(d.type==="bryter")cmd("bryter",d.id,"OFF")});toast("Slår av alt i "+z);setTimeout(loadDevices,2000)});
+  $$("[data-alloff]").forEach(b=>b.onclick=()=>{const z=b.dataset.alloff;DEVS.filter(d=>d.sone===z&&d.på).forEach(d=>{if(d.type==="lys")cmd("lys",d.id,0);if(d.type==="bryter")cmd("bryter",d.id,"OFF")});toast("Turning everything off in "+z);setTimeout(loadDevices,2000)});
 }
 
 /* ---------- endre / fjerne ---------- */
 let editId=null;
 function openEdit(id){const d=DEVS.find(x=>x.id===id);if(!d)return;editId=id;
-  $("#edittitle").textContent="Endre "+d.navn;$("#editnavn").value=d.navn;$("#editsone").value=d.sone;$("#editdlg").showModal()}
+  $("#edittitle").textContent="Edit "+d.navn;$("#editnavn").value=d.navn;$("#editsone").value=d.sone;$("#editdlg").showModal()}
 $("#editavbryt").onclick=()=>$("#editdlg").close();
 $("#editlagre").onclick=async()=>{const r=await post("api/extra/update",{id:editId,navn:$("#editnavn").value,sone:$("#editsone").value});
-  $("#editdlg").close();r.ok?toast("Lagret. Home Assistant oppdateres om et øyeblikk."):toast(r.feil||"Feil",true);loadDevices()};
-$("#editrm").onclick=async()=>{const d=DEVS.find(x=>x.id===editId);if(!confirm(`Fjerne «${d?d.navn:editId}» fra Home Assistant? Automasjoner som bruker den slutter å virke.`))return;
-  const r=await post("api/extra/remove",{id:editId});$("#editdlg").close();r.ok?toast("Fjernet"):toast(r.feil||"Feil",true);loadDevices()};
+  $("#editdlg").close();r.ok?toast("Saved. Home Assistant updates in a moment."):toast(r.feil||"Error",true);loadDevices()};
+$("#editrm").onclick=async()=>{const d=DEVS.find(x=>x.id===editId);if(!confirm(`Remove «${d?d.navn:editId}» from Home Assistant? Automations that use it will stop working.`))return;
+  const r=await post("api/extra/remove",{id:editId});$("#editdlg").close();r.ok?toast("Removed"):toast(r.feil||"Error",true);loadDevices()};
 
 /* ---------- knapper ---------- */
 let scanInfo=null;
 function renderButtons(){
   const bs=DEVS.filter(d=>d.type==="knapp").sort((a,b)=>(a.sek_siden??1e9)-(b.sek_siden??1e9));
   $("#btnlist").innerHTML=bs.map(b=>`<div class="btnrow ${b.sek_siden!=null&&b.sek_siden<4?"pressed":""}"><div class="ic">${ic("btn")}</div>
-    <div class="tx"><b>${esc(b.navn)}</b> <span class="muted">· ${esc(b.sone)}</span><div class="small muted">${b.siste?`Siste: <span class="tag">${esc(b.siste)}</span> ${ago(b.sek_siden)}`:"Ingen trykk siden appen startet"}</div></div>
-    ${b.ekstra?`<button class="btn icon" data-edit="${b.id}" title="Endre navn eller rom">${ic("pen")}</button>`:""}</div>`).join("")||'<div class="empty">Ingen knapper ennå. Trykk på en bryter i huset, så dukker den opp øverst her og kan legges til.</div>';
+    <div class="tx"><b>${esc(b.navn)}</b> <span class="muted">· ${esc(b.sone)}</span><div class="small muted">${b.siste?`Last: <span class="tag">${esc(b.siste)}</span> ${ago(b.sek_siden)}`:"No presses since the app started"}</div></div>
+    ${b.ekstra?`<button class="btn icon" data-edit="${b.id}" title="Change name or room">${ic("pen")}</button>`:""}</div>`).join("")||'<div class="empty">No buttons yet. Press a switch in the house, and it shows up at the top here so it can be added.</div>';
   $$("#btnlist [data-edit]").forEach(e=>e.onclick=()=>openEdit(+e.dataset.edit));
 }
 async function loadNewButtons(){
   scanInfo=await api("api/scan");const ny=scanInfo.nylig||[];
   $("#nybadge").hidden=!ny.length;$("#nybadge").textContent=ny.length;
-  if(tab!=="knapper")return;
-  $("#nyknapper").innerHTML=ny.length?`<div class="card" style="margin-bottom:14px;border-color:var(--acc)"><h2>${ic("info")}Nye knapper funnet <span class="sub">trykket på, men ikke lagt til ennå</span></h2>${ny.map(x=>`<div class="item"><div class="tx"><b>${esc(x.navn)}</b><div class="small muted">${esc(x.objekt)} · nr. ${x.id} · ${ago(x.sek_siden)}</div></div><button class="btn pri" data-add="${x.id}">Legg til i HA</button></div>`).join("")}</div>`:"";
-  $$("#nyknapper [data-add]").forEach(b=>b.onclick=async()=>{b.disabled=true;await post("api/extra",{knapper:[+b.dataset.add]});toast("Lagt til. Den dukker opp i HA om et øyeblikk.");loadNewButtons();loadDevices()});
+  if(tab!=="buttons")return;
+  $("#nyknapper").innerHTML=ny.length?`<div class="card" style="margin-bottom:14px;border-color:var(--acc)"><h2>${ic("info")}New buttons found <span class="sub">pressed, but not added yet</span></h2>${ny.map(x=>`<div class="item"><div class="tx"><b>${esc(x.navn)}</b><div class="small muted">${esc(x.objekt)} · no. ${x.id} · ${ago(x.sek_siden)}</div></div><button class="btn pri" data-add="${x.id}">Add to HA</button></div>`).join("")}</div>`:"";
+  $$("#nyknapper [data-add]").forEach(b=>b.onclick=async()=>{b.disabled=true;await post("api/extra",{knapper:[+b.dataset.add]});toast("Added. It shows up in HA in a moment.");loadNewButtons();loadDevices()});
 }
 
 /* ---------- enheter ---------- */
-const KINDS=[["lys","Dimbare lys","bulb"],["brytere","Av/på-brytere","power"],["knapper","Knapper og innganger","btn"]];
+const KINDS=[["lys","Dimmable lights","bulb"],["brytere","On/off switches","power"],["knapper","Buttons and inputs","btn"]];
 async function loadEnheter(){
   const s=scanInfo=await api("api/scan"),st=s.status,c=s.kandidater;
-  $("#scanstat").innerHTML=st.running?`<div class="progress"><div style="width:${Math.round(st.progress*100)}%"></div></div><div class="small muted">${Math.round(st.progress*100)} % · ${st.found} objekter funnet så langt</div>`
-    :`<div class="row"><button class="btn pri" id="scan">${ic("wave")}${st.finished?"Søk på nytt":"Start søk"}</button><span class="small muted">${st.finished?`Sist kjørt ${esc(st.finished)} · ${st.objects} objekter`:"Ikke kjørt ennå"}${st.error?` · <span style="color:var(--err)">Feil: ${esc(st.error)}</span>`:""}</span></div>`;
-  const sb=$("#scan");if(sb)sb.onclick=async()=>{sb.disabled=true;await post("api/scan/start");toast("Søket er startet");loadEnheter()};
+  $("#scanstat").innerHTML=st.running?`<div class="progress"><div style="width:${Math.round(st.progress*100)}%"></div></div><div class="small muted">${Math.round(st.progress*100)} % · ${st.found} objects found so far</div>`
+    :`<div class="row"><button class="btn pri" id="scan">${ic("wave")}${st.finished?"Search again":"Start search"}</button><span class="small muted">${st.finished?`Last run ${esc(st.finished)} · ${st.objects} objects`:"Not run yet"}${st.error?` · <span style="color:var(--err)">Error: ${esc(st.error)}</span>`:""}</span></div>`;
+  const sb=$("#scan");if(sb)sb.onclick=async()=>{sb.disabled=true;await post("api/scan/start");toast("The search has started");loadEnheter()};
   const keep={};$$("#kand [data-k]").forEach(r=>keep[r.dataset.k]={navn:r.querySelector(".nv").value,sone:r.querySelector(".sv").value,på:r.querySelector("input[type=checkbox]").checked});
   const open=KINDS.map(([k])=>({k,arr:(c[k]||[]).filter(x=>!x.lagt_til)}));
   const n=open.reduce((a,x)=>a+x.arr.length,0);
-  if(!n){$("#kand").innerHTML=`<div class="empty">${st.objects?"Alt som ble funnet er lagt til. Fint!":"Kjør søket først, så dukker enhetene opp her."}</div>`;return}
+  if(!n){$("#kand").innerHTML=`<div class="empty">${st.objects?"Everything that was found has been added. Nice!":"Run the search first, and the devices show up here."}</div>`;return}
   if($("#kand").dataset.sig===JSON.stringify(open.map(x=>x.arr.map(y=>y.id))))return;   // ikke tegn på nytt mens man skriver
   $("#kand").dataset.sig=JSON.stringify(open.map(x=>x.arr.map(y=>y.id)));
   $("#kand").innerHTML=open.filter(x=>x.arr.length).map(({k,arr})=>{const[,title,icn]=KINDS.find(x=>x[0]===k);
-    return `<div class="mt"><div class="cand-hd">${ic(icn)}<h3>${title} <span class="muted small">(${arr.length})</span></h3><label class="small muted row" style="gap:6px"><input type="checkbox" data-all="${k}" checked> velg alle</label></div>
+    return `<div class="mt"><div class="cand-hd">${ic(icn)}<h3>${title} <span class="muted small">(${arr.length})</span></h3><label class="small muted row" style="gap:6px"><input type="checkbox" data-all="${k}" checked> select all</label></div>
     ${arr.map(x=>{const id=k+":"+x.id,kp=keep[id]||{},m=/^IN_([^_]+)_(.+)$/.exec(x.objekt||"");
-      if(m&&kp.navn==null){kp.navn=x.navn.startsWith(m[1]+" ")?x.navn.slice(m[1].length+1):x.navn;kp.sone=m[1]}return `<div class="item" data-k="${id}"><input type="checkbox" ${kp.på===false?"":"checked"} data-kind="${k}"><div class="tx"><span class="small muted">${esc(x.objekt)} · nr. ${x.id}</span></div>
-      <input type="text" class="sm nv" value="${esc(kp.navn??x.navn)}" placeholder="Navn"><input type="text" class="sm sv" list="romliste" value="${esc(kp.sone??"")}" placeholder="Rom"></div>`}).join("")}</div>`}).join("")
-    +`<div class="row mt"><button class="btn pri" id="addsel">Legg til valgte i Home Assistant</button><span class="small muted">Uten rom havner de under «Nye enheter».</span></div>`;
+      if(m&&kp.navn==null){kp.navn=x.navn.startsWith(m[1]+" ")?x.navn.slice(m[1].length+1):x.navn;kp.sone=m[1]}return `<div class="item" data-k="${id}"><input type="checkbox" ${kp.på===false?"":"checked"} data-kind="${k}"><div class="tx"><span class="small muted">${esc(x.objekt)} · no. ${x.id}</span></div>
+      <input type="text" class="sm nv" value="${esc(kp.navn??x.navn)}" placeholder="Name"><input type="text" class="sm sv" list="romliste" value="${esc(kp.sone??"")}" placeholder="Room"></div>`}).join("")}</div>`}).join("")
+    +`<div class="row mt"><button class="btn pri" id="addsel">Add selected to Home Assistant</button><span class="small muted">Without a room they end up under «New devices».</span></div>`;
   $$("#kand [data-all]").forEach(cb=>cb.onchange=()=>$$(`#kand [data-kind=${cb.dataset.all}]`).forEach(x=>x.checked=cb.checked));
   $("#addsel").onclick=async()=>{const body={lys:[],brytere:[],knapper:[]};
     $$("#kand [data-k]").forEach(r=>{if(!r.querySelector("input[type=checkbox]").checked)return;const[k,id]=r.dataset.k.split(":");
       body[k].push({id:+id,navn:r.querySelector(".nv").value,sone:r.querySelector(".sv").value})});
-    if(!body.lys.length&&!body.brytere.length&&!body.knapper.length)return toast("Ingenting er valgt",true);
-    $("#addsel").disabled=true;const r=await post("api/extra",body);toast(`La til ${r.lagt_til.length} enheter. De dukker opp i Home Assistant om et øyeblikk.`);
+    if(!body.lys.length&&!body.brytere.length&&!body.knapper.length)return toast("Nothing is selected",true);
+    $("#addsel").disabled=true;const r=await post("api/extra",body);toast(`Added ${r.lagt_til.length} devices. They show up in Home Assistant in a moment.`);
     $("#kand").dataset.sig="";loadEnheter();loadDevices()};
   if(st.objects!==allCount)loadAll(st.objects);
 }
@@ -525,57 +526,57 @@ async function loadAll(count){allCount=count;allObj=await api("api/scan/all");re
 $("#objsok").oninput=renderObj;
 function renderObj(){
   const q=($("#objsok").value||"").toLowerCase().trim();
-  if(!allObj.length){$("#objres").innerHTML='<div class="small muted">Kjør søket først, så kan du søke i alt Home Manager har.</div>';return}
-  if(!q){$("#objres").innerHTML=`<div class="small muted">${allObj.length} objekter i siste søk. Skriv for å søke.</div>`;return}
+  if(!allObj.length){$("#objres").innerHTML='<div class="small muted">Run the search first, then you can search everything in the Home Manager.</div>';return}
+  if(!q){$("#objres").innerHTML=`<div class="small muted">${allObj.length} objects in the last search. Type to search.</div>`;return}
   const hits=allObj.filter(o=>o.navn.toLowerCase().includes(q)||String(o.id).includes(q)).slice(0,150);
-  $("#objres").innerHTML=hits.map(o=>`<div class="item"><div class="tx"><b>${esc(o.navn)}</b><div class="small muted">nr. ${o.id} · type ${o.type}${o.kjent?" · brukes allerede":""}</div></div>${o.kjent?"":`<button class="btn" data-addo="${o.id}">Legg til som knapp</button>`}</div>`).join("")||'<div class="small muted">Ingen treff.</div>';
-  $$("[data-addo]").forEach(b=>b.onclick=async()=>{b.disabled=true;await post("api/extra",{knapper:[+b.dataset.addo]});toast("Lagt til");allCount=-1;loadEnheter()});
+  $("#objres").innerHTML=hits.map(o=>`<div class="item"><div class="tx"><b>${esc(o.navn)}</b><div class="small muted">no. ${o.id} · type ${o.type}${o.kjent?" · already in use":""}</div></div>${o.kjent?"":`<button class="btn" data-addo="${o.id}">Add as button</button>`}</div>`).join("")||'<div class="small muted">No matches.</div>';
+  $$("[data-addo]").forEach(b=>b.onclick=async()=>{b.disabled=true;await post("api/extra",{knapper:[+b.dataset.addo]});toast("Added");allCount=-1;loadEnheter()});
 }
 
 /* ---------- usb ---------- */
 async function loadUsb(){
   const u=await api("api/usb"),L=u.laering||{};
-  const modus={hybrid:"hybrid (pinnen først, Home Manager som reserve)",pinne:"bare USB-pinne",home_manager:"bare Home Manager"}[u.modus]||u.modus;
-  const pill=!u.aktivert?`<span class="pill inl">Av: «Lysstyring» står på bare Home Manager</span>`
-    :u.tilkoblet?`<span class="pill ok inl"><span class="d"></span>Tilkoblet${u.navn?" · "+esc(u.navn):""}</span>`
-    :`<span class="pill warn inl"><span class="d"></span>Ingen pinne funnet. Lys går via Home Manager.</span>`;
-  $("#usbstat").innerHTML=`<div class="row">${pill}<span class="small muted">Lysstyring: <b>${esc(modus)}</b> (endres i appens Konfigurasjon)</span></div>
-   <div class="stats">${stat(`${u.lys_med_kart}<small class="muted" style="font-size:13px"> / ${u.lys_totalt}</small>`,"lys har dimmere i kartet")}${stat(u.sendt,"radiomeldinger sendt")}${stat(u.bekreftet,"bekreftet av dimmeren")}${stat(u.bekreftet_hm||0,"bekreftet via Home Manager")}${u.modus==="pinne"?stat(u.ubekreftet,"ikke bekreftet"):stat(u.via_reserve,"tatt over av Home Manager")}${stat(u.store_bolker||0,"store bolker via Home Manager")}</div>
-   ${u.siste_feil?`<div class="small mt" style="color:var(--err)">Siste feil: ${esc(u.siste_feil)}</div>`:""}`;
+  const modus={hybrid:"hybrid (stick first, Home Manager as fallback)",usb_stick:"USB stick only",home_manager:"Home Manager only"}[u.modus]||u.modus;
+  const pill=!u.aktivert?`<span class="pill inl">Off: «Light control» is set to Home Manager only</span>`
+    :u.tilkoblet?`<span class="pill ok inl"><span class="d"></span>Connected${u.navn?" · "+esc(u.navn):""}</span>`
+    :`<span class="pill warn inl"><span class="d"></span>No stick found. Lights go through the Home Manager.</span>`;
+  $("#usbstat").innerHTML=`<div class="row">${pill}<span class="small muted">Light control: <b>${esc(modus)}</b> (changed in the app's Configuration)</span></div>
+   <div class="stats">${stat(`${u.lys_med_kart}<small class="muted" style="font-size:13px"> / ${u.lys_totalt}</small>`,"lights with dimmers in the map")}${stat(u.sendt,"radio messages sent")}${stat(u.bekreftet,"confirmed by the dimmer")}${stat(u.bekreftet_hm||0,"confirmed via the Home Manager")}${u.modus==="usb_stick"?stat(u.ubekreftet,"not confirmed"):stat(u.via_reserve,"taken over by the Home Manager")}${stat(u.store_bolker||0,"large batches via the Home Manager")}</div>
+   ${u.siste_feil?`<div class="small mt" style="color:var(--err)">Last error: ${esc(u.siste_feil)}</div>`:""}`;
   const missing=u.lys_totalt-u.lys_med_kart;
-  $("#usblearn").innerHTML=L.kjorer?`<div class="progress"><div style="width:${L.totalt?Math.round(L.ferdig/L.totalt*100):0}%"></div></div><div class="small muted">${L.ferdig} av ${L.totalt} · ${esc(L.melding)}</div>`
-   :`<div class="row"><button class="btn pri" id="learnmiss" ${!u.tilkoblet||!missing?"disabled":""}>${ic("radio")}Finn dimmere for ${missing} lys som mangler</button><button class="btn" id="learnall" ${!u.tilkoblet||!u.lys_totalt?"disabled":""}>Lær alle på nytt</button>${!u.tilkoblet?`<span class="small muted">Krever at pinnen er tilkoblet.</span>`:""}</div>
-     ${L.melding?`<div class="small mt">${esc(L.melding)}${(L.uten_svar||[]).length?`<div class="muted">Fikk ikke svar fra: ${L.uten_svar.map(esc).join(", ")}. De er trolig utenfor rekkevidde for pinnen, eller er av/på-lys uten dimmer.</div>`:""}</div>`:""}`;
+  $("#usblearn").innerHTML=L.kjorer?`<div class="progress"><div style="width:${L.totalt?Math.round(L.ferdig/L.totalt*100):0}%"></div></div><div class="small muted">${L.ferdig} of ${L.totalt} · ${esc(L.melding)}</div>`
+   :`<div class="row"><button class="btn pri" id="learnmiss" ${!u.tilkoblet||!missing?"disabled":""}>${ic("radio")}Find dimmers for ${missing} missing lights</button><button class="btn" id="learnall" ${!u.tilkoblet||!u.lys_totalt?"disabled":""}>Learn all again</button>${!u.tilkoblet?`<span class="small muted">Requires the stick to be connected.</span>`:""}</div>
+     ${L.melding?`<div class="small mt">${esc(L.melding)}${(L.uten_svar||[]).length?`<div class="muted">No answer from: ${L.uten_svar.map(esc).join(", ")}. They are probably out of range of the stick, or on/off lights without a dimmer.</div>`:""}</div>`:""}`;
   const lm=$("#learnmiss"),la=$("#learnall");
-  if(lm)lm.onclick=async()=>{const r=await post("api/usb/laer",{lys:"mangler"});r.ok?toast(`Lytter på ${r.antall} lys …`):toast(r.feil,true);loadUsb()};
-  if(la)la.onclick=async()=>{if(!confirm("Lære alle lys på nytt? Det tar omtrent 10 sekunder per lys."))return;const r=await post("api/usb/laer",{lys:"alle"});r.ok?toast(`Lytter på ${r.antall} lys …`):toast(r.feil,true);loadUsb()};
-  $("#usbkart").innerHTML=u.kart.length?`<table class="t"><tr><th>Lys</th><th>Dimmere (serienummer)</th></tr>${u.kart.map(k=>`<tr><td>${esc(k.navn)}</td><td class="mono">${k.serienr.join(", ")}</td></tr>`).join("")}</table>`:`<div class="small muted">Ingen lys i kartet ennå.</div>`;
-  $("#usbframes summary").textContent=`Hva pinnen hører (${u.mottatt||0} rammer, ${u.radio_mottatt||0} radiomeldinger, ${u.kvitteringer||0} kvitteringer)`;
-  $("#usbraw").textContent=(u.siste_rammer||[]).map(r=>r[0]+"  "+r[1]).join("\n")||"Ingenting mottatt ennå.";
+  if(lm)lm.onclick=async()=>{const r=await post("api/usb/laer",{lys:"mangler"});r.ok?toast(`Listening to ${r.antall} lights …`):toast(r.feil,true);loadUsb()};
+  if(la)la.onclick=async()=>{if(!confirm("Learn all lights again? It takes about 10 seconds per light."))return;const r=await post("api/usb/laer",{lys:"alle"});r.ok?toast(`Listening to ${r.antall} lights …`):toast(r.feil,true);loadUsb()};
+  $("#usbkart").innerHTML=u.kart.length?`<table class="t"><tr><th>Light</th><th>Dimmers (serial number)</th></tr>${u.kart.map(k=>`<tr><td>${esc(k.navn)}</td><td class="mono">${k.serienr.join(", ")}</td></tr>`).join("")}</table>`:`<div class="small muted">No lights in the map yet.</div>`;
+  $("#usbframes summary").textContent=`What the stick hears (${u.mottatt||0} frames, ${u.radio_mottatt||0} radio messages, ${u.kvitteringer||0} acknowledgements)`;
+  $("#usbraw").textContent=(u.siste_rammer||[]).map(r=>r[0]+"  "+r[1]).join("\n")||"Nothing received yet.";
   const rd=u.radio_dimmere||[];
-  $("#usbradio summary").textContent=`Radiomeldinger til og fra dimmerne (${rd.length})`;
-  $("#usbradiotab").innerHTML=rd.length?`<table class="t"><tr><th>Tid</th><th>Lys</th><th>Retning</th><th>Siste kommando</th><th>Ramme</th></tr>${rd.slice().reverse().map(r=>`<tr><td>${esc(r.tid)}</td><td>${esc(r.lys)}</td><td>${esc(r.retning)}</td><td>${esc(r.siste_kommando)}</td><td class="mono small">${esc(r.ramme)}</td></tr>`).join("")}</table>`:`<div class="small muted">Ingenting ennå.</div>`;
+  $("#usbradio summary").textContent=`Radio messages to and from the dimmers (${rd.length})`;
+  $("#usbradiotab").innerHTML=rd.length?`<table class="t"><tr><th>Time</th><th>Light</th><th>Direction</th><th>Last command</th><th>Frame</th></tr>${rd.slice().reverse().map(r=>`<tr><td>${esc(r.tid)}</td><td>${esc(r.lys)}</td><td>${esc(r.retning)}</td><td>${esc(r.siste_kommando)}</td><td class="mono small">${esc(r.ramme)}</td></tr>`).join("")}</table>`:`<div class="small muted">Nothing yet.</div>`;
 }
-$("#usbfil").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const r=await post("api/usb/kart",JSON.parse(await f.text()));toast(`Kart lagret: ${r.lys_med_kart} lys`);loadUsb()}catch(err){toast("Kunne ikke lese fila: "+err.message,true)}e.target.value=""};
+$("#usbfil").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const r=await post("api/usb/kart",JSON.parse(await f.text()));toast(`Map saved: ${r.lys_med_kart} lights`);loadUsb()}catch(err){toast("Could not read the file: "+err.message,true)}e.target.value=""};
 
 /* ---------- logg ---------- */
 let logCursor=0,logPaused=false,logLevel="",LOG=[];
 $$("#lognivaa button").forEach(b=>b.onclick=()=>{logLevel=b.dataset.v;$$("#lognivaa button").forEach(x=>x.classList.toggle("on",x===b));renderLog(true)});
 $("#logsok").oninput=()=>renderLog(true);
-$("#logpause").onclick=()=>{logPaused=!logPaused;$("#logpause").textContent=logPaused?"Fortsett":"Pause";$("#logpause").classList.toggle("pri",logPaused)};
+$("#logpause").onclick=()=>{logPaused=!logPaused;$("#logpause").textContent=logPaused?"Resume":"Pause";$("#logpause").classList.toggle("pri",logPaused)};
 $("#logtom").onclick=()=>{LOG=[];renderLog(true)};
-$("#loglast").onclick=()=>{const b=new Blob([LOG.map(l=>l.t).join("\n")],{type:"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="xcomfort_logg.txt";a.click()};
+$("#loglast").onclick=()=>{const b=new Blob([LOG.map(l=>l.t).join("\n")],{type:"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="xcomfort_log.txt";a.click()};
 async function loadLog(){if(logPaused)return;const n=await api("api/log?after="+logCursor);if(!n.length)return;logCursor=n[n.length-1].n;LOG=LOG.concat(n).slice(-2000);renderLog(false,n)}
 function logMatch(l){const q=($("#logsok").value||"").toLowerCase();if(logLevel==="INFO"&&l.l!=="INFO")return false;if(logLevel==="WARN"&&!(l.l==="WARNING"||l.l==="ERROR"))return false;return !q||l.t.toLowerCase().includes(q)}
 function logHTML(l){const m=/^(\S+)\s+(\S+)\s+(.*)$/.exec(l.t)||[0,"",l.l,l.t];return `<div class="logline ${esc(l.l)}"><span class="muted">${esc(m[1])}</span><span class="lv ${esc(l.l)}">${esc(l.l)}</span><span class="m">${esc(m[3])}</span></div>`}
 function renderLog(full,added){
   const w=$("#logwrap"),atBottom=w.scrollTop+w.clientHeight>=w.scrollHeight-40;
-  if(full)$("#logbox").innerHTML=LOG.filter(logMatch).map(logHTML).join("")||'<div class="empty">Ingen linjer.</div>';
+  if(full)$("#logbox").innerHTML=LOG.filter(logMatch).map(logHTML).join("")||'<div class="empty">No lines.</div>';
   else{const box=$("#logbox");if(box.querySelector(".empty"))box.innerHTML="";box.insertAdjacentHTML("beforeend",added.filter(logMatch).map(logHTML).join(""));while(box.children.length>2000)box.firstChild.remove()}
   if(atBottom||full)w.scrollTop=w.scrollHeight;
 }
 let rawCursor=0,rawPaused=false;
-$("#rawpause").onclick=()=>{rawPaused=!rawPaused;$("#rawpause").textContent=rawPaused?"Fortsett":"Pause"};
+$("#rawpause").onclick=()=>{rawPaused=!rawPaused;$("#rawpause").textContent=rawPaused?"Resume":"Pause"};
 async function loadRaw(){if(rawPaused||!$("#rawdet").open)return;const n=await api("api/raw?after="+rawCursor);if(!n.length)return;rawCursor=n[n.length-1].n;
   const q=($("#rawsok").value||"").toLowerCase(),box=$("#rawbox"),atB=box.scrollTop+box.clientHeight>=box.scrollHeight-30;
   box.insertAdjacentHTML("beforeend",n.filter(l=>!q||l.t.toLowerCase().includes(q)).map(l=>esc(l.t)+"\n").join(""));
@@ -588,13 +589,13 @@ async function tick(now){
   try{
     await loadStatus();
     await loadEvents();
-    if(tab==="hjem"){if(now||n%3===1)await loadDevices();if(!scanInfo||n%15===0)scanInfo=await api("api/scan");renderHome();renderFeed()}
-    if(tab==="rom"&&(now||n%2===0))await loadDevices();
-    if(tab==="knapper"){await loadDevices();if(now||n%3===0)await loadNewButtons()}else if(n%10===0)await loadNewButtons();
-    if(tab==="enheter"&&(now||n%3===0)){await loadEnheter();if(now)await loadDevices()}
+    if(tab==="home"){if(now||n%3===1)await loadDevices();if(!scanInfo||n%15===0)scanInfo=await api("api/scan");renderHome();renderFeed()}
+    if(tab==="rooms"&&(now||n%2===0))await loadDevices();
+    if(tab==="buttons"){await loadDevices();if(now||n%3===0)await loadNewButtons()}else if(n%10===0)await loadNewButtons();
+    if(tab==="devices"&&(now||n%3===0)){await loadEnheter();if(now)await loadDevices()}
     if(tab==="usb")await loadUsb();
-    if(tab==="logg"){await loadLog();await loadRaw()}
-  }catch(e){$("#pill").className="pill err";$("#pilltx").textContent="Mister kontakt med appen"}
+    if(tab==="log"){await loadLog();await loadRaw()}
+  }catch(e){$("#pill").className="pill err";$("#pilltx").textContent="Lost contact with the app"}
   busy=false;
 }
 show(tab);setInterval(()=>tick(false),2000);

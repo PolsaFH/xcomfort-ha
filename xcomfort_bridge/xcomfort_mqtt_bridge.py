@@ -47,7 +47,7 @@ import usbstick
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.8.0"
+BRIDGE_VERSION = "3.0.0"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -60,17 +60,32 @@ DEFAULT_OPTIONS = {
     "mqtt_password": "",
     "log_level": "info",
     "poll_interval": 20,
-    "markise_posisjon": True,
-    "markise_kjoretid_balkong": 20.0,
-    "markise_kjoretid_paviljong": 34.0,
-    "markise_kjoretid_boblebad": 25.0,
-    "markise_pause_mellom_kommandoer": 0.5,
-    "markise_dobbel_stopp": True,
-    "markise_gjenta_bevegelse": False,
-    "hurtig_status": True,
-    "lysbrytere_som_lys": False,
-    "lysstyring": "hybrid",
+    "awning_position": True,
+    "awning_runtime_balcony": 20.0,
+    "awning_runtime_pavilion": 34.0,
+    "awning_runtime_hot_tub": 25.0,
+    "awning_command_gap": 0.5,
+    "awning_double_stop": True,
+    "awning_repeat_move": False,
+    "instant_status": True,
+    "switches_as_lights": False,
+    "light_control": "hybrid",
 }
+
+# Innstillinger som het noe annet før 3.0.0 (norske navn). Leses fortsatt.
+LEGACY_OPTIONS = {
+    "markise_posisjon": "awning_position",
+    "markise_kjoretid_balkong": "awning_runtime_balcony",
+    "markise_kjoretid_paviljong": "awning_runtime_pavilion",
+    "markise_kjoretid_boblebad": "awning_runtime_hot_tub",
+    "markise_pause_mellom_kommandoer": "awning_command_gap",
+    "markise_dobbel_stopp": "awning_double_stop",
+    "markise_gjenta_bevegelse": "awning_repeat_move",
+    "hurtig_status": "instant_status",
+    "lysbrytere_som_lys": "switches_as_lights",
+    "lysstyring": "light_control",
+}
+LEGACY_VALUES = {"light_control": {"pinne": "usb_stick"}}
 
 OPTIONS_FILE = "/data/options.json"
 
@@ -83,9 +98,13 @@ def load_options():
     if os.path.exists(OPTIONS_FILE):
         try:
             with open(OPTIONS_FILE, encoding="utf-8") as f:
-                opts.update({k: v for k, v in json.load(f).items() if v is not None})
+                raw = {k: v for k, v in json.load(f).items() if v is not None}
+            for old, new in LEGACY_OPTIONS.items():
+                if old in raw and new not in raw:
+                    raw[new] = raw.pop(old)
+            opts.update(raw)
         except Exception as e:  # noqa: BLE001
-            print(f"Klarte ikke lese {OPTIONS_FILE}: {e} -- bruker standardverdier")
+            print(f"Could not read {OPTIONS_FILE}: {e} -- using defaults")
     else:
         env_map = {"xcomfort_ip": "XCOMFORT_IP", "xcomfort_port": "XCOMFORT_PORT",
                    "mqtt_host": "MQTT_HOST", "mqtt_port": "MQTT_PORT",
@@ -96,9 +115,11 @@ def load_options():
                 opts[key] = os.environ[env]
     for key in ("xcomfort_port", "mqtt_port", "poll_interval"):
         opts[key] = int(opts[key])
-    for key in ("markise_kjoretid_balkong", "markise_kjoretid_paviljong",
-                "markise_kjoretid_boblebad", "markise_pause_mellom_kommandoer"):
+    for key in ("awning_runtime_balcony", "awning_runtime_pavilion",
+                "awning_runtime_hot_tub", "awning_command_gap"):
         opts[key] = float(opts[key])
+    for key, values in LEGACY_VALUES.items():
+        opts[key] = values.get(opts[key], opts[key])
     return opts
 
 
@@ -125,8 +146,8 @@ def setup_logging(level_name):
     logging.getLogger("paho").setLevel(logging.WARNING)
 
 
-log = logging.getLogger("xcomfort.bro")
-mlog = logging.getLogger("xcomfort.markise")
+log = logging.getLogger("xcomfort.bridge")
+mlog = logging.getLogger("xcomfort.awning")
 
 # ------------------------------------------------------------- konstanter --
 
@@ -136,7 +157,7 @@ DIAG_TOPIC = "xcomfort/bridge/diag"
 HA_STATUS_TOPIC = "homeassistant/status"
 HEALTH_PORT = 8099
 
-ORIGIN = {"name": "xComfort lokal bro", "sw_version": BRIDGE_VERSION}
+ORIGIN = {"name": "xComfort local bridge", "sw_version": BRIDGE_VERSION}
 
 CONTINUOUS_SENSORS = [s for s in xc.SENSORS if s[3]]
 BINARY_SENSORS = [s for s in xc.SENSORS if not s[3]]
@@ -147,9 +168,9 @@ BALKONG_RESET_BUTTON_ID = "balkong_reset"
 
 # Kjoeretid fra helt inn til helt ut per markise (fra appens innstillinger).
 MARKISE_RUNTIME_OPTION = {
-    50980: "markise_kjoretid_balkong",
-    124354: "markise_kjoretid_paviljong",
-    65125: "markise_kjoretid_boblebad",
+    50980: "awning_runtime_balcony",
+    124354: "awning_runtime_pavilion",
+    65125: "awning_runtime_hot_tub",
 }
 
 # Ekstra tid vi lar motoren gaa naar maalet er helt inn/helt ut, saa den
@@ -186,14 +207,14 @@ class Stats:
         self.last_contact = None
         self.sent = 0
         self.failed = 0
-        self.last_error = "ingen"
+        self.last_error = "none"
         self.poll_seconds = 0.0
-        self.markise = {sid: {"sendt": 0, "feilet": 0, "siste": "ingen"} for _, _, sid in xc.MARKISER}
+        self.markise = {sid: {"sendt": 0, "feilet": 0, "siste": "none"} for _, _, sid in xc.MARKISER}
         self.bekreftet = 0
         self.ubekreftet = 0
         self.responstider = collections.deque(maxlen=50)   # dict(navn, sek, tid)
         self.radio = collections.deque(maxlen=2000)          # tidspunkt for radiokvitteringer
-        self.poll_modus = "vanlig"
+        self.poll_modus = "every few seconds"
 
     def contact_ok(self):
         with self.lock:
@@ -306,13 +327,13 @@ def open_hm(purpose, attempts=3):
             return conn
         except Exception as e:  # noqa: BLE001
             last = e
-            log.warning("Tilkobling til Home Manager feilet (%s, forsoek %d/%d): %s",
+            log.warning("Connection to Home Manager failed (%s, attempt %d/%d): %s",
                         purpose, attempt, attempts, e)
             if attempt < attempts:
                 time.sleep(delay)
                 delay *= 2
     STATS.contact_failed(f"{purpose}: {last}")
-    raise ConnectionError(f"Home Manager svarer ikke ({purpose}): {last}")
+    raise ConnectionError(f"Home Manager is not responding ({purpose}): {last}")
 
 
 # ---------------------------------------------------------------- topics --
@@ -338,7 +359,7 @@ def device_block(zone):
 
 BRIDGE_DEVICE = {
     "identifiers": ["xcomfort_bridge_diag"],
-    "name": "xComfort bro",
+    "name": "xComfort bridge",
     "manufacturer": "Eaton / Sensio",
     "model": "Lokal MQTT-bro",
     "sw_version": BRIDGE_VERSION,
@@ -511,7 +532,7 @@ def publish_cover_discovery(client):
             "qos": 1,
             "device": device_block(zone),
         }
-        if OPTS["markise_posisjon"]:
+        if OPTS["awning_position"]:
             payload.update({
                 "state_topic": cover_state_topic(smux_id),
                 "position_topic": cover_position_topic(smux_id),
@@ -544,7 +565,7 @@ def publish_climate_discovery(client):
         })
         publish_state(client, climate_mode_topic(smux_id), "heat")
         _pub_disc(client, "sensor", f"xcomfort_valve_{smux_id}", {
-            "name": f"{name} fysisk styring",
+            "name": f"{name} valve",
             "unique_id": f"xcomfort_valve_{smux_id}",
             "state_topic": climate_valve_topic(smux_id),
             "unit_of_measurement": "°",
@@ -558,7 +579,7 @@ def publish_button_discovery(client):
     if not xc.MARKISER:
         return
     _pub_disc(client, "button", f"xcomfort_{BALKONG_RESET_BUTTON_ID}", {
-        "name": "Resett markiser",
+        "name": "Reset awnings",
         "unique_id": f"xcomfort_button_{BALKONG_RESET_BUTTON_ID}",
         "command_topic": balkong_reset_button_topic(),
         "payload_press": "PRESS",
@@ -579,25 +600,25 @@ def publish_diag_discovery(client):
         _pub_disc(client, "sensor", f"xcomfort_diag_{uid}", p)
 
     _pub_disc(client, "binary_sensor", "xcomfort_diag_hm_tilkoblet", dict(
-        base, name="Home Manager tilkoblet", unique_id="xcomfort_diag_hm_tilkoblet",
+        base, name="Home Manager connected", unique_id="xcomfort_diag_hm_tilkoblet",
         value_template="{{ value_json.hm_ok }}", payload_on="ON", payload_off="OFF",
         device_class="connectivity"))
-    sensor("siste_kontakt", "Siste kontakt med Home Manager",
+    sensor("siste_kontakt", "Last contact with Home Manager",
            "{{ value_json.last_contact }}", device_class="timestamp")
-    sensor("kommandoer_sendt", "Kommandoer sendt", "{{ value_json.sent }}", state_class="total_increasing")
-    sensor("kommandoer_feilet", "Kommandoer feilet", "{{ value_json.failed }}", state_class="total_increasing")
-    sensor("siste_feil", "Siste feil", "{{ value_json.last_error }}")
-    sensor("pollrunde", "Varighet pollrunde", "{{ value_json.poll_seconds }}",
+    sensor("kommandoer_sendt", "Commands sent", "{{ value_json.sent }}", state_class="total_increasing")
+    sensor("kommandoer_feilet", "Commands failed", "{{ value_json.failed }}", state_class="total_increasing")
+    sensor("siste_feil", "Last error", "{{ value_json.last_error }}")
+    sensor("pollrunde", "Poll duration", "{{ value_json.poll_seconds }}",
            unit_of_measurement="s", state_class="measurement")
-    sensor("markise_koe", "Markise-kø", "{{ value_json.markise_queue }}", state_class="measurement")
-    sensor("versjon", "Versjon", "{{ value_json.version }}")
+    sensor("markise_koe", "Awning queue", "{{ value_json.markise_queue }}", state_class="measurement")
+    sensor("versjon", "Version", "{{ value_json.version }}")
     for _zone, name, sid in xc.MARKISER:
         short = name.replace("Markise ", "").capitalize()
-        sensor(f"markise_{sid}_sendt", f"{short}: kommandoer sendt",
+        sensor(f"markise_{sid}_sendt", f"{short}: commands sent",
                f"{{{{ value_json.m{sid}_sendt }}}}", state_class="total_increasing")
-        sensor(f"markise_{sid}_feilet", f"{short}: kommandoer feilet",
+        sensor(f"markise_{sid}_feilet", f"{short}: commands failed",
                f"{{{{ value_json.m{sid}_feilet }}}}", state_class="total_increasing")
-        sensor(f"markise_{sid}_siste", f"{short}: siste kommando",
+        sensor(f"markise_{sid}_siste", f"{short}: last command",
                f"{{{{ value_json.m{sid}_siste }}}}")
         # Fjern sensorer fra 2.0.x som ikke finnes lenger (tom config = slett)
         for old in ("uten_svar", "kvittert", "uten_kvittering"):
@@ -605,23 +626,23 @@ def publish_diag_discovery(client):
                            "", qos=1, retain=True)
 
     _pub_disc(client, "binary_sensor", "xcomfort_diag_lytter", dict(
-        base, name="Øyeblikkelig status (lytte-forbindelse)", unique_id="xcomfort_diag_lytter",
+        base, name="Instant status (listener connection)", unique_id="xcomfort_diag_lytter",
         value_template="{{ value_json.listener_ok }}", payload_on="ON", payload_off="OFF",
         device_class="connectivity"))
-    sensor("responstid_siste", "Responstid lys (siste)", "{{ value_json.resp_last }}",
+    sensor("responstid_siste", "Light response time (last)", "{{ value_json.resp_last }}",
            unit_of_measurement="s", state_class="measurement")
-    sensor("responstid_snitt", "Responstid lys (snitt siste 50)", "{{ value_json.resp_avg }}",
+    sensor("responstid_snitt", "Light response time (average of last 50)", "{{ value_json.resp_avg }}",
            unit_of_measurement="s", state_class="measurement")
-    sensor("lys_bekreftet", "Lyskommandoer bekreftet av lampa", "{{ value_json.confirmed }}",
+    sensor("lys_bekreftet", "Light commands confirmed by the lamp", "{{ value_json.confirmed }}",
            state_class="total_increasing")
-    sensor("lys_ubekreftet", "Lyskommandoer uten bekreftelse", "{{ value_json.unconfirmed }}",
+    sensor("lys_ubekreftet", "Light commands without confirmation", "{{ value_json.unconfirmed }}",
            state_class="total_increasing")
-    sensor("radio_5min", "Radiokvitteringer siste 5 min", "{{ value_json.radio_5min }}",
+    sensor("radio_5min", "Radio acknowledgements, last 5 min", "{{ value_json.radio_5min }}",
            state_class="measurement")
 
 
 def publish_discovery(client):
-    log.info("Sender discovery for %d lys, %d brytere, %d sensorer, %d alarmer, %d markiser, %d termostater",
+    log.info("Publishing discovery for %d lights, %d switches, %d sensors, %d alarms, %d awnings, %d thermostats",
              len(xc.LIGHTS), len(xc.SWITCHES), len(CONTINUOUS_SENSORS), len(BINARY_SENSORS),
              len(xc.MARKISER), len(xc.THERMOSTATS))
     publish_light_discovery(client)
@@ -693,7 +714,7 @@ def _parse_light_brightness(payload_bytes):
     try:
         data = json.loads(payload_bytes.decode("utf-8"))
     except Exception as e:  # noqa: BLE001
-        log.warning("Klarte ikke tolke lys-kommando %r: %s", payload_bytes, e)
+        log.warning("Could not parse light command %r: %s", payload_bytes, e)
         return None
     if data.get("state", "ON") == "OFF":
         return 0
@@ -736,7 +757,7 @@ def cached_objects(conn, smux_id, cache, finder, for_command=False):
     info = finder(conn, smux_id, cache)
     if not info:
         _discovery_retry_after[smux_id] = time.time() + DISCOVERY_BACKOFF_S
-        log.warning("Hopper over %s i pollingen de neste %d min (styre-objekter ikke funnet).",
+        log.warning("Skipping %s in polling for the next %d min (control objects not found).",
                     smux_id, DISCOVERY_BACKOFF_S // 60)
     return info
 
@@ -787,9 +808,9 @@ def _on_usb_radio(frame, info):
     if src == usbstick.STICK_ADDR:
         return
     if dst in SERIAL_TO_LIGHT:
-        smux, retning = SERIAL_TO_LIGHT[dst], "til dimmer"
+        smux, retning = SERIAL_TO_LIGHT[dst], "to dimmer"
     elif src in SERIAL_TO_LIGHT and dst != usbstick.STICK_ADDR:
-        smux, retning = SERIAL_TO_LIGHT[src], "fra dimmer"
+        smux, retning = SERIAL_TO_LIGHT[src], "from dimmer"
     else:
         return
     pct, how = LAST_CMD_PCT.get(smux, (None, ""))
@@ -808,7 +829,7 @@ def load_usb_map():
         USB_MAP = {}
         return USB_MAP
     except Exception as e:  # noqa: BLE001
-        log.warning("Klarte ikke lese USB-kartet %s: %s", USB_MAP_FILE, e)
+        log.warning("Could not read the USB map %s: %s", USB_MAP_FILE, e)
         USB_MAP = {}
         return USB_MAP
     lights = {s for _, _, s in xc.LIGHTS}
@@ -834,13 +855,13 @@ def usb_grace(smux_id, pct):
     return bool(last and time.time() - last[1] < USB_GRACE_S and abs(last[0] - pct) > 2)
 
 
-LIGHT_MODES = ("hybrid", "pinne", "home_manager")
+LIGHT_MODES = ("hybrid", "usb_stick", "home_manager")
 
 
 def light_mode():
     """Hvordan lys styres: hybrid (pinne, Home Manager som reserve), bare
     pinne, eller bare Home Manager."""
-    m = OPTS.get("lysstyring")
+    m = OPTS.get("light_control")
     if m in LIGHT_MODES:
         return m
     return "home_manager" if OPTS.get("usb_pinne") is False else "hybrid"  # gammel innstilling (2.5.0)
@@ -886,7 +907,7 @@ def _try_usb(client, batch, t_start):
         return batch
     if mode == "hybrid" and len(targets) > USB_MAX_DIMMERE_HYBRID:
         USB_STATS["stor_bolk"] += 1
-        log.info("Stor bolk (%d dimmere) sendes via Home Manager, det går raskere enn pinnen", len(targets))
+        log.info("Large batch (%d dimmers) sent via Home Manager, which is faster than the stick", len(targets))
         return batch
     # Vis ny tilstand i HA med en gang; sendingen til mange dimmere kan ta litt tid
     t_pre = time.time()
@@ -899,12 +920,12 @@ def _try_usb(client, batch, t_start):
             LAST_USB.pop(smux_id, None)
         if mode == "hybrid":
             return batch  # pinnen virker ikke -- alt går via Home Manager
-        log.error("Bare pinne er valgt, men USB-pinnen virker ikke: %d lys ble IKKE styrt (%s)",
+        log.error("USB stick only is selected, but the stick is not working: %d lights were NOT controlled (%s)",
                   len(lights), ", ".join(str(REG["names"].get(s, s)) for s, _, _ in lights))
         STATS.add(failed=len(lights))
         return rest
     t0, acked = result
-    _finish_batch(client, [(s, b, None) for s, b, _ in lights], [], [], t_start, "via USB-pinnen")
+    _finish_batch(client, [(s, b, None) for s, b, _ in lights], [], [], t_start, "via the USB stick")
     unconfirmed = []
     for light in lights:
         if all(int(x) in acked for x in light[2]):
@@ -935,12 +956,12 @@ def _check_usb_acks(lights, t0, fallback=True):
         names = ", ".join(str(s) for s in missing)
         if not fallback:
             USB_STATS["ubekreftet"] += 1
-            log.warning("Lys %s: %d av %d dimmere kvitterte ikke via USB-pinnen (%s). Bare pinne er valgt, "
-                        "så det sendes ikke via Home Manager.", REG["names"].get(smux_id, smux_id),
+            log.warning("Light %s: %d of %d dimmers did not acknowledge via the USB stick (%s). USB stick only is selected, "
+                        "so it is not sent via Home Manager.", REG["names"].get(smux_id, smux_id),
                         len(missing), len(serials), names)
             continue
         USB_STATS["reserve"] += 1
-        log.warning("Lys %s: %d av %d dimmere kvitterte ikke via USB-pinnen (%s) -- sender via Home Manager",
+        log.warning("Light %s: %d of %d dimmers did not acknowledge via the USB stick (%s) -- sending via Home Manager",
                     REG["names"].get(smux_id, smux_id), len(missing), len(serials), names)
         _force_hm[smux_id] = time.time() + 5
         LAST_USB.pop(smux_id, None)
@@ -993,16 +1014,16 @@ def learn_usb_map(light_ids):
     """Lærer hvilke dimmere hvert lys styrer ved å lytte på radio mens
     Home Manager sender. Kjøres i egen tråd fra nettsiden."""
     LEARN.update(kjorer=True, ferdig=0, totalt=len(light_ids), resultat={}, uten_svar=[],
-                 melding="Lytter …")
+                 melding="Listening …")
     names = REG["names"]
     try:
         for smux in light_ids:
             if STICK is None or not STICK.healthy():
-                LEARN["melding"] = "USB-pinnen er ikke tilkoblet"
+                LEARN["melding"] = "The USB stick is not connected"
                 break
             _learning.add(smux)
             try:
-                LEARN["melding"] = f"Lytter på {names.get(smux, smux)}"
+                LEARN["melding"] = f"Listening to {names.get(smux, smux)}"
                 taken = {x for k, v in USB_MAP.items() if k != smux for x in v} | \
                     {x for k, v in LEARN["resultat"].items() if k != smux for x in v}
                 found = sorted(_learn_one(smux) - taken)
@@ -1017,12 +1038,12 @@ def learn_usb_map(light_ids):
             merged = dict(USB_MAP)
             merged.update(LEARN["resultat"])
             save_usb_map(merged)
-        LEARN["melding"] = (f"Ferdig: {len(LEARN['resultat'])} lys lært"
-                            + (f", {len(LEARN['uten_svar'])} uten svar" if LEARN["uten_svar"] else ""))
-        log.info("USB-kart lært: %s", LEARN["melding"])
+        LEARN["melding"] = (f"Done: learned {len(LEARN['resultat'])} lights"
+                            + (f", {len(LEARN['uten_svar'])} without an answer" if LEARN["uten_svar"] else ""))
+        log.info("USB map learned: %s", LEARN["melding"])
     except Exception as e:  # noqa: BLE001
-        LEARN["melding"] = f"Stoppet: {e}"
-        log.exception("Læring av USB-kart feilet")
+        LEARN["melding"] = f"Stopped: {e}"
+        log.exception("Learning the USB map failed")
     finally:
         LEARN["lys"] = None
         LEARN["kjorer"] = False
@@ -1032,17 +1053,17 @@ def start_usb_stick():
     global STICK
     mode = light_mode()
     if mode == "home_manager":
-        log.info("Lysstyring: bare Home Manager (USB-pinnen brukes ikke)")
+        log.info("Light control: Home Manager only (the USB stick is not used)")
         return
-    log.info("Lysstyring: %s", "bare USB-pinne" if mode == "pinne" else
-             "hybrid (USB-pinne, Home Manager som reserve)")
+    log.info("Light control: %s", "USB stick only" if mode == "usb_stick" else
+             "hybrid (USB stick, Home Manager as fallback)")
     n = len(load_usb_map())
     STICK = usbstick.UsbStick(on_radio=_on_usb_radio)
     threading.Thread(target=STICK.run, daemon=True, name="usb").start()
     if n:
-        log.info("USB-kart lastet: %d lys har serienumre", n)
+        log.info("USB map loaded: %d lights have dimmer serial numbers", n)
     else:
-        log.info("Ingen USB-kart ennå (last opp under Verktøy på nettsiden) -- pinnen brukes ikke til lys før det finnes")
+        log.info("No USB map yet (use USB stick -> Find dimmers on the web page) -- the stick is not used for lights until then")
 
 
 def _fast_batch_lines(batch, cache):
@@ -1072,7 +1093,7 @@ def _fast_batch_lines(batch, cache):
             try:
                 target = float(payload.decode("utf-8").strip())
             except (ValueError, UnicodeDecodeError):
-                log.warning("Ugyldig temperatur-kommando for termostat %s: %r", smux_id, payload)
+                log.warning("Invalid temperature command for thermostat %s: %r", smux_id, payload)
                 continue
             target = max(xc.THERMOSTAT_MIN, min(xc.THERMOSTAT_MAX, target))
             first.append(f"set_value {smux_id} {target}")
@@ -1087,10 +1108,10 @@ def _finish_batch(client, armed_lights, armed_switches, applied_climate, t_start
     STATS.add(sent=n)
     if n:
         names = ", ".join(
-            [f"lys {s}->{b}%" for s, b, _ in armed_lights]
-            + [f"bryter {s}->{'PÅ' if o else 'AV'}" for s, o, _ in armed_switches]
-            + [f"termostat {s}->{t}°" for s, t in applied_climate])
-        log.info("Kommando-bolk (%d sendt %s, %.2fs etter at HA ba om det): %s",
+            [f"light {s}->{b}%" for s, b, _ in armed_lights]
+            + [f"switch {s}->{'ON' if o else 'OFF'}" for s, o, _ in armed_switches]
+            + [f"thermostat {s}->{t}°" for s, t in applied_climate])
+        log.info("Command batch (%d sent %s, %.2fs after HA asked): %s",
                  n, how, time.time() - t_start, names)
     now = time.time()
     for smux_id, brightness, _ in armed_lights:
@@ -1117,9 +1138,9 @@ def _try_fast_batch(client, batch, cache, t_start):
     if first and second:
         time.sleep(SET_TO_EXECUTE_PAUSE_S)
     if not link.send_lines(second):
-        log.warning("Hurtigveien feilet midt i en bolk -- sender på nytt via egen forbindelse")
+        log.warning("The fast path failed in the middle of a batch -- resending via a separate connection")
         return False
-    _finish_batch(client, lights, switches, climates, t_start, "via lytte-forbindelsen")
+    _finish_batch(client, lights, switches, climates, t_start, "via the listener connection")
     return True
 
 
@@ -1137,9 +1158,9 @@ def _process_command_batch(client, batch, t_start=None):
 
     with conn_lock:
         try:
-            conn = open_hm("kommando-bolk")
+            conn = open_hm("command batch")
         except ConnectionError as e:
-            log.error("Kommando-bolk med %d kommando(er) ble IKKE sendt: %s", len(batch), e)
+            log.error("Command batch with %d command(s) was NOT sent: %s", len(batch), e)
             STATS.add(failed=len(batch))
             return
         try:
@@ -1151,7 +1172,7 @@ def _process_command_batch(client, batch, t_start=None):
                             continue
                         info = cached_objects(conn, smux_id, cache, xc.get_device_objects, for_command=True)
                         if not info:
-                            log.error("Lys %s: fant ikke styre-objekter, kommando ikke sendt", smux_id)
+                            log.error("Light %s: control objects not found, command not sent", smux_id)
                             STATS.add(failed=1)
                             continue
                         conn.send_line(f"set_value {info['val_id']} {brightness}")
@@ -1160,7 +1181,7 @@ def _process_command_batch(client, batch, t_start=None):
                         on = payload.decode("utf-8").strip().upper() == "ON"
                         info = cached_objects(conn, smux_id, cache, xc.get_switch_objects, for_command=True)
                         if not info:
-                            log.error("Bryter %s: fant ikke av/paa-knapp, kommando ikke sendt", smux_id)
+                            log.error("Switch %s: on/off objects not found, command not sent", smux_id)
                             STATS.add(failed=1)
                             continue
                         armed_switches.append((smux_id, on, info["on_id"] if on else info["off_id"]))
@@ -1168,13 +1189,13 @@ def _process_command_batch(client, batch, t_start=None):
                         try:
                             target = float(payload.decode("utf-8").strip())
                         except (ValueError, UnicodeDecodeError):
-                            log.warning("Ugyldig temperatur-kommando for termostat %s: %r", smux_id, payload)
+                            log.warning("Invalid temperature command for thermostat %s: %r", smux_id, payload)
                             continue
                         target = max(xc.THERMOSTAT_MIN, min(xc.THERMOSTAT_MAX, target))
                         conn.send_line(f"set_value {smux_id} {target}")
                         applied_climate.append((smux_id, target))
                 except Exception as e:  # noqa: BLE001
-                    log.error("Feil ved %s-kommando for %s: %s", kind, smux_id, e)
+                    log.error("Error in %s command for %s: %s", kind, smux_id, e)
                     STATS.add(failed=1)
 
             if armed_lights or armed_switches:
@@ -1185,15 +1206,15 @@ def _process_command_batch(client, batch, t_start=None):
                 conn.send_line(f"new_state {target_id} 0")
             reply = conn.drain(wait=0.2)
         except Exception as e:  # noqa: BLE001
-            log.error("Kommando-bolk avbrutt: %s", e)
-            STATS.contact_failed(f"kommando-bolk: {e}")
+            log.error("Command batch aborted: %s", e)
+            STATS.contact_failed(f"command batch: {e}")
             STATS.add(failed=len(batch))
             return
         finally:
             conn.close()
 
-    log.debug("Svar paa bolk: %s", xc.readable(reply) or "(ingen)")
-    _finish_batch(client, armed_lights, armed_switches, applied_climate, t_start, "via egen forbindelse")
+    log.debug("Reply to batch: %s", xc.readable(reply) or "(none)")
+    _finish_batch(client, armed_lights, armed_switches, applied_climate, t_start, "via a separate connection")
 
 
 def command_batch_worker(client):
@@ -1212,7 +1233,7 @@ def command_batch_worker(client):
         try:
             _process_command_batch(client, batch, t_first)
         except Exception:  # noqa: BLE001
-            log.exception("Kommando-bolk feilet uventet")
+            log.exception("Command batch failed unexpectedly")
         publish_diag(client)
 
 
@@ -1320,7 +1341,7 @@ class MarkiseController:
         self.q.put((time.time(), smux_id, action, value))
         m = self.markiser.get(smux_id)
         if m is not None:
-            txt = {"ut": "kjører ut", "inn": "kjører inn", "stopp": "stopp"}.get(action, str(action))
+            txt = {"ut": "extending", "inn": "retracting", "stopp": "stop"}.get(action, str(action))
             if value is not None:
                 txt = f"{txt} ({value})"
             web.EVENTS.add(f"{m.name}: {txt}", "markise")
@@ -1336,23 +1357,23 @@ class MarkiseController:
             for sid, m in self.markiser.items():
                 if str(sid) in data:
                     m.position = float(data[str(sid)])
-            mlog.info("Leste lagrede markiseposisjoner: %s",
+            mlog.info("Loaded saved awning positions: %s",
                       {m.name: round(m.position) for m in self.markiser.values()})
         except FileNotFoundError:
-            mlog.info("Ingen lagrede markiseposisjoner -- antar at alle er helt inne (0 %). "
-                      "Kjoer 'Resett markiser' for aa kalibrere.")
+            mlog.info("No saved awning positions -- assuming all are fully retracted (0 %). "
+                      "Run 'Reset awnings' to calibrate.")
         except Exception as e:  # noqa: BLE001
-            mlog.warning("Klarte ikke lese markiseposisjoner: %s", e)
+            mlog.warning("Could not read awning positions: %s", e)
 
     def _save_positions(self):
         try:
             with open(POSITION_FILE, "w", encoding="utf-8") as f:
                 json.dump({str(sid): round(m.current_position(), 1) for sid, m in self.markiser.items()}, f)
         except Exception as e:  # noqa: BLE001
-            mlog.warning("Klarte ikke lagre markiseposisjoner: %s", e)
+            mlog.warning("Could not save awning positions: %s", e)
 
     def publish(self, m):
-        if not (self.client and OPTS["markise_posisjon"]):
+        if not (self.client and OPTS["awning_position"]):
             return
         publish_state(self.client, cover_position_topic(m.smux_id), str(int(round(m.current_position()))))
         publish_state(self.client, cover_state_topic(m.smux_id), m.ha_state())
@@ -1371,7 +1392,7 @@ class MarkiseController:
         markise-trafikk (lukkes etter noen sekunder uten), slik eoptHome-
         appen ogsaa gjoer. Feiler sendingen paa en gammel forbindelse,
         aapnes en ny og telegrammet sendes paa nytt EN gang."""
-        gap = OPTS["markise_pause_mellom_kommandoer"]
+        gap = OPTS["awning_command_gap"]
         wait = self.last_tx + gap - time.time()
         if wait > 0:
             time.sleep(wait)
@@ -1387,7 +1408,7 @@ class MarkiseController:
         for attempt in (1, 2):
             try:
                 if self.conn is None:
-                    self.conn = open_hm(f"markise {m.name}")
+                    self.conn = open_hm(f"awning {m.name}")
                 self.conn.send_line(f"new_state {oid} 0")
                 t_sent = time.time()
                 reply = self.conn.drain(wait=MARKISE_SVAR_VENT_S)
@@ -1400,13 +1421,13 @@ class MarkiseController:
                 if t_sent is not None:
                     break  # sendt, men lesing av svar feilet -- ikke send dobbelt
                 if attempt == 1 and not isinstance(e, ConnectionError):
-                    mlog.warning("%s: forbindelsen var brutt (%s) -- proever paa nytt", m.name, e)
+                    mlog.warning("%s: the connection was broken (%s) -- retrying", m.name, e)
         if t_sent is None:
             stats["feilet"] += 1
             STATS.add(failed=1)
-            STATS.contact_failed(f"markise {m.name}: {error}")
-            stats["siste"] = f"{now_str()} {action} FEILET"
-            mlog.error("%s (%s): '%s' ble IKKE sendt (%s): %s", m.name, m.smux_id, action, reason, error)
+            STATS.contact_failed(f"awning {m.name}: {error}")
+            stats["siste"] = f"{now_str()} {action} FAILED"
+            mlog.error("%s (%s): '%s' was NOT sent (%s): %s", m.name, m.smux_id, action, reason, error)
             return None
         self.last_tx = t_sent
         stats["sendt"] += 1
@@ -1414,7 +1435,7 @@ class MarkiseController:
         readable = xc.readable(reply)
         stats["siste"] = f"{now_str()} {action}"
         mlog.info("%s (%s): %s -> new_state %s 0 [%s]", m.name, m.smux_id, action, oid, reason)
-        mlog.debug("%s: svar fra Home Manager: %s", m.name, readable or "(ingen)")
+        mlog.debug("%s: reply from Home Manager: %s", m.name, readable or "(none)")
         return t_sent
 
     def _close_conn(self):
@@ -1434,14 +1455,14 @@ class MarkiseController:
             # fjern ventende "stopp" fra set_position for denne markisen
             self.scheduled = [s for s in self.scheduled
                               if not (s[1] == m.smux_id and s[3] == "set_position")]
-            if OPTS["markise_dobbel_stopp"] and reason != "ekstra stopp":
-                self.scheduled.append((t_sent + DOBBEL_STOPP_PAUSE_S, m.smux_id, "stopp", "ekstra stopp"))
-        elif reason == "gjentatt" and m.moving == action:
+            if OPTS["awning_double_stop"] and reason != "extra stop":
+                self.scheduled.append((t_sent + DOBBEL_STOPP_PAUSE_S, m.smux_id, "stopp", "extra stop"))
+        elif reason == "repeat" and m.moving == action:
             pass  # samme bevegelse paa nytt: anslaget fortsetter uendret
         else:
             m.start(action, t_sent)
-            if OPTS["markise_gjenta_bevegelse"] and reason != "gjentatt":
-                self.scheduled.append((t_sent + GJENTA_BEVEGELSE_PAUSE_S, m.smux_id, action, "gjentatt"))
+            if OPTS["awning_repeat_move"] and reason != "repeat":
+                self.scheduled.append((t_sent + GJENTA_BEVEGELSE_PAUSE_S, m.smux_id, action, "repeat"))
         self._save_positions()
         self.publish(m)
         return t_sent
@@ -1449,15 +1470,15 @@ class MarkiseController:
     def _handle(self, smux_id, action, value, queued_at):
         m = self.markiser.get(smux_id)
         if not m:
-            mlog.warning("Ukjent markise %s", smux_id)
+            mlog.warning("Unknown awning %s", smux_id)
             return
         age = time.time() - queued_at
         if age > 2:
-            mlog.warning("%s: kommando '%s' laa %.1fs i koe foer sending", m.name, action, age)
+            mlog.warning("%s: command '%s' waited %.1fs in the queue before sending", m.name, action, age)
         if action == "set_position":
             plan = plan_set_position(m, value)
-            mlog.info("%s: set_position %s %% (naa ca. %d %%) -> %s", m.name, value,
-                      round(m.current_position()), f"{plan[0]} i {plan[1]:.1f}s" if plan else "ingen bevegelse")
+            mlog.info("%s: set_position %s %% (now about %d %%) -> %s", m.name, value,
+                      round(m.current_position()), f"{plan[0]} for {plan[1]:.1f}s" if plan else "no movement")
             if not plan:
                 self.publish(m)
                 return
@@ -1477,9 +1498,9 @@ class MarkiseController:
         cancelled = [s for s in self.scheduled if s[1] == smux_id]
         if cancelled:
             self.scheduled = [s for s in self.scheduled if s[1] != smux_id]
-            mlog.info("%s: ny kommando '%s' -- avbryter planlagt %s", m.name, action,
+            mlog.info("%s: new command '%s' -- cancelling scheduled %s", m.name, action,
                       ", ".join(f"'{c[2]}' ({c[3]})" for c in cancelled))
-        self._do(m, action, "fra HA")
+        self._do(m, action, "from HA")
 
     def run(self, client):
         self.client = client
@@ -1494,7 +1515,7 @@ class MarkiseController:
                     try:
                         self._do(self.markiser[sid], action, reason)
                     except Exception:  # noqa: BLE001
-                        mlog.exception("Planlagt markise-handling feilet")
+                        mlog.exception("Scheduled awning action failed")
                 publish_diag(client)
                 continue
             # neste kommando fra HA
@@ -1509,7 +1530,7 @@ class MarkiseController:
             try:
                 self._handle(sid, action, value, queued_at)
             except Exception:  # noqa: BLE001
-                mlog.exception("Markise-kommando feilet uventet")
+                mlog.exception("Awning command failed unexpectedly")
             publish_diag(client)
 
     def _tick(self):
@@ -1546,9 +1567,9 @@ def handle_cover_command(client, smux_id, payload_bytes):
     word = payload_bytes.decode("utf-8", errors="replace").strip().upper()
     action = MARKISE_COMMAND_TO_ACTION.get(word)
     if not action:
-        mlog.warning("Ukjent markise-kommando %r for %s", word, smux_id)
+        mlog.warning("Unknown awning command %r for %s", word, smux_id)
         return
-    mlog.info("Mottatt fra HA: markise %s -> %s", smux_id, action)
+    mlog.info("From HA: awning %s -> %s", smux_id, action)
     MARKISER_CTRL.enqueue(smux_id, action)
 
 
@@ -1556,9 +1577,9 @@ def handle_cover_position(client, smux_id, payload_bytes):
     try:
         value = float(payload_bytes.decode("utf-8").strip())
     except (ValueError, UnicodeDecodeError):
-        mlog.warning("Ugyldig posisjon %r for markise %s", payload_bytes, smux_id)
+        mlog.warning("Invalid position %r for awning %s", payload_bytes, smux_id)
         return
-    mlog.info("Mottatt fra HA: markise %s -> posisjon %s %%", smux_id, value)
+    mlog.info("From HA: awning %s -> position %s %%", smux_id, value)
     MARKISER_CTRL.enqueue(smux_id, "set_position", value)
 
 
@@ -1582,7 +1603,7 @@ def _onoff_light_command(client, smux_id, payload):
 
 def _republish_after_ha_restart(client):
     time.sleep(random.uniform(2, 5))  # la HA bli ferdig med aa starte MQTT
-    log.info("Home Assistant er startet paa nytt -- sender discovery og tilstand paa nytt")
+    log.info("Home Assistant restarted -- publishing discovery and state again")
     publish_discovery(client)
     with _state_cache_lock:
         cached = list(_state_cache.items())
@@ -1593,10 +1614,10 @@ def _republish_after_ha_restart(client):
 
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code != 0:
-        log.error("Klarte ikke koble til MQTT-megleren (reason_code=%s). Sjekk brukernavn/passord.", reason_code)
+        log.error("Could not connect to the MQTT broker (reason_code=%s). Check the username and password.", reason_code)
         return
     MQTT_STATE["connected"] = True
-    log.info("Tilkoblet MQTT-megleren")
+    log.info("Connected to the MQTT broker")
     client.publish(AVAILABILITY_TOPIC, "online", qos=1, retain=True)
     publish_discovery(client)
     for topic in ("xcomfort/light/+/set", "xcomfort/switch/+/set", "xcomfort/cover/+/set",
@@ -1610,7 +1631,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
 
 def on_disconnect(client, userdata, flags, reason_code, properties):
     MQTT_STATE["connected"] = False
-    log.warning("Mistet forbindelsen til MQTT-megleren (reason_code=%s) -- kobler til igjen automatisk",
+    log.warning("Lost the connection to the MQTT broker (reason_code=%s) -- reconnecting automatically",
                 reason_code)
 
 
@@ -1632,7 +1653,7 @@ def on_message(client, userdata, message):
                 handler(client, int(m.group(1)), message.payload)
                 return
     except Exception:  # noqa: BLE001
-        log.exception("Feil ved behandling av MQTT-melding paa %s", message.topic)
+        log.exception("Error while handling MQTT message on %s", message.topic)
 
 
 # ------------------------------------------------------------------ poll --
@@ -1724,7 +1745,7 @@ def poll_all(client):
         try:
             conn = open_hm("polling", attempts=1)
         except ConnectionError as e:
-            log.warning("Pollrunde hoppet over: %s", e)
+            log.warning("Poll round skipped: %s", e)
             return
     try:
         discover_one_missing_light(conn)
@@ -1736,15 +1757,15 @@ def poll_all(client):
                 section(client, conn)
         STATS.contact_ok()
     except Exception as e:  # noqa: BLE001
-        log.warning("Pollrunde avbrutt: %s", e)
+        log.warning("Poll round aborted: %s", e)
         STATS.contact_failed(f"polling: {e}")
     finally:
         conn.close()
     STATS.poll_seconds = time.time() - t0
     if STATS.poll_seconds > 10:
-        log.warning("Pollrunden tok %.1fs (vanlig er ca. 5s)", STATS.poll_seconds)
+        log.warning("The poll round took %.1fs (usually about 5s)", STATS.poll_seconds)
     else:
-        log.debug("Pollrunde ferdig paa %.2fs", STATS.poll_seconds)
+        log.debug("Poll round finished in %.2fs", STATS.poll_seconds)
 
 
 def poll_loop(client):
@@ -1756,8 +1777,8 @@ def poll_loop(client):
         time.sleep(1.0)
         fast = LINK is not None and LINK.healthy()
         interval = FULL_AVLESNING_S if fast else OPTS["poll_interval"]
-        STATS.poll_modus = "øyeblikkelig (+ full avlesning hvert 5. min)" if fast else \
-            f"hvert {OPTS['poll_interval']}. sekund"
+        STATS.poll_modus = "instantly (+ a full read every 5 min)" if fast else \
+            f"every {OPTS['poll_interval']} seconds"
         if time.time() - last < interval:
             continue
         last = time.time()
@@ -1765,7 +1786,7 @@ def poll_loop(client):
         try:
             poll_all(client)
         except Exception:  # noqa: BLE001
-            log.exception("Pollrunde feilet")
+            log.exception("Poll round failed")
         publish_diag(client)
 
 
@@ -1799,9 +1820,9 @@ BUTTONS = [
 # Koder fra en trykknapp satt opp som "Generell inngang" i xSetup
 # (kartlagt med BR stue 18.10.2026): kort trykk gir 1/0, langt trykk gir
 # start + slipp.
-KNAPP_KODER = {0: "kort_ned", 1: "kort_opp", 2: "langt_opp", 3: "langt_opp_slipp",
+KNAPP_KODER = {0: "short_down", 1: "short_up", 2: "long_up", 3: "long_up_release",
                4: "langt_ned", 5: "langt_ned_slipp"}
-EVENT_TYPES = list(KNAPP_KODER.values()) + [f"kode_{i}" for i in range(6, 10)]
+EVENT_TYPES = list(KNAPP_KODER.values()) + [f"code_{i}" for i in range(6, 10)]
 
 # Av/paa-brytere som egentlig er lys. Med innstillingen "lysbrytere_som_lys"
 # faar disse i tillegg en ekte lys-entitet i HA (bryteren beholdes).
@@ -1847,7 +1868,7 @@ def onoff_command_topic(i):
 
 def publish_switch_state(client, smux_id, on, force=False):
     publish_state(client, switch_state_topic(smux_id), "ON" if on else "OFF", force=force)
-    if OPTS["lysbrytere_som_lys"] and smux_id in LIGHT_SWITCH_IDS:
+    if OPTS["switches_as_lights"] and smux_id in LIGHT_SWITCH_IDS:
         publish_state(client, onoff_state_topic(smux_id), json.dumps({"state": "ON" if on else "OFF"}), force=force)
 
 
@@ -1880,11 +1901,11 @@ def publish_onoff_light_discovery(client):
         if smux_id not in LIGHT_SWITCH_IDS:
             continue
         topic = f"{DISCOVERY_PREFIX}/light/xcomfort_onoff_{smux_id}/config"
-        if not OPTS["lysbrytere_som_lys"]:
+        if not OPTS["switches_as_lights"]:
             client.publish(topic, "", qos=1, retain=True)
             continue
         _pub_disc(client, "light", f"xcomfort_onoff_{smux_id}", {
-            "name": f"{name} (lys)",
+            "name": f"{name} (light)",
             "unique_id": f"xcomfort_onofflight_{smux_id}",
             "state_topic": onoff_state_topic(smux_id),
             "command_topic": onoff_command_topic(smux_id),
@@ -1906,7 +1927,7 @@ def load_extras():
     except FileNotFoundError:
         return
     except Exception as e:  # noqa: BLE001
-        log.warning("Klarte ikke lese %s: %s", EXTRA_FILE, e)
+        log.warning("Could not read %s: %s", EXTRA_FILE, e)
         return
     cache = xc.load_cache()
     known = {s for _, _, s in xc.LIGHTS} | {s for _, _, s in xc.SWITCHES} | {b[2] for b in BUTTONS}
@@ -1914,14 +1935,14 @@ def load_extras():
     for item in extra.get("lys", []):
         if item["id"] in known:
             continue
-        xc.LIGHTS.append((item.get("sone", "Nye enheter"), item["navn"], item["id"]))
+        xc.LIGHTS.append((item.get("sone", "New devices"), item["navn"], item["id"]))
         if item.get("val_id") and item.get("set_id") and str(item["id"]) not in cache:
             cache[str(item["id"])] = {"name": item.get("objekt"), "val_id": item["val_id"], "set_id": item["set_id"]}
             changed = True
     for item in extra.get("brytere", []):
         if item["id"] in known:
             continue
-        xc.SWITCHES.append((item.get("sone", "Nye enheter"), item["navn"], item["id"]))
+        xc.SWITCHES.append((item.get("sone", "New devices"), item["navn"], item["id"]))
         if item.get("on_id") and item.get("off_id") and str(item["id"]) not in cache:
             cache[str(item["id"])] = {"name": item.get("objekt"), "on_id": item["on_id"], "off_id": item["off_id"]}
             changed = True
@@ -1932,7 +1953,7 @@ def load_extras():
         IDMAP.expect(item["id"], item.get("objekt"))
     if changed:
         xc.save_cache(cache)
-    log.info("Ekstra enheter fra nettsiden: %d lys, %d brytere, %d knapper",
+    log.info("Devices added from the web page: %d lights, %d switches, %d buttons",
              len(extra.get("lys", [])), len(extra.get("brytere", [])), len(extra.get("knapper", [])))
 
 
@@ -1948,7 +1969,7 @@ def load_extras():
 
 PROFILE_FILE = "/data/anlegg.json" if os.path.isdir("/data") else \
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "anlegg.json")
-PROFILE = {"innebygd": False, "grunn": "ikke sjekket"}
+PROFILE = {"innebygd": False, "grunn": "not checked"}
 
 
 def _load_seed():
@@ -1970,19 +1991,19 @@ def _names_match_seed(seed, sample=12):
     try:
         conn = xc.XComfortConn()
     except Exception as e:  # noqa: BLE001
-        log.info("Kunne ikke sjekke anlegget nå (%s)", e)
+        log.info("Could not check the installation right now (%s)", e)
         return None
     try:
         conn.sock.sendall(b"".join(xc.STX + f"d_obj {i}".encode("ascii") + xc.ETX for i, _ in items))
         text = conn.drain(wait=1.0)
     except Exception as e:  # noqa: BLE001
-        log.info("Kunne ikke sjekke anlegget nå (%s)", e)
+        log.info("Could not check the installation right now (%s)", e)
         return None
     finally:
         conn.close()
     got = {int(o): n for o, n, _t in scanner.NAME_TYPE_RE.findall(text)}
     hits = sum(1 for i, n in items if got.get(i) == n)
-    log.info("Sjekk av anlegget: %d av %d kjente navn stemte", hits, len(items))
+    log.info("Installation check: %d of %d known names matched", hits, len(items))
     return hits >= min(2, len(items))
 
 
@@ -1992,30 +2013,30 @@ def decide_profile(check=_names_match_seed):
         with open(PROFILE_FILE, encoding="utf-8") as f:
             saved = json.load(f)
         if isinstance(saved.get("innebygd"), bool):
-            PROFILE.update(innebygd=saved["innebygd"], grunn="lagret valg")
+            PROFILE.update(innebygd=saved["innebygd"], grunn="saved choice")
             return PROFILE["innebygd"]
     except FileNotFoundError:
         pass
     except Exception as e:  # noqa: BLE001
-        log.warning("Klarte ikke lese %s: %s", PROFILE_FILE, e)
+        log.warning("Could not read %s: %s", PROFILE_FILE, e)
     had_data = os.path.exists(xc.CACHE_FILE)   # appen har kjørt her før (eldre versjon)
     ok = check(_load_seed())
     if ok is None:
         # Home Manager svarer ikke akkurat nå. En installasjon som har kjørt
         # før (fra før denne sjekken fantes) beholder listene; en ny starter
         # tom. Ingenting lagres, så det sjekkes igjen ved neste oppstart.
-        PROFILE.update(innebygd=had_data, grunn="Home Manager svarte ikke, sjekkes ved neste oppstart")
+        PROFILE.update(innebygd=had_data, grunn="Home Manager did not answer, checking again at next start")
         return had_data
     if not ok and had_data:
-        log.warning("Denne installasjonen har kjørt en eldre versjon, men navnene i Home Manager stemmer ikke med "
-                    "den innebygde enhetslisten. Appen starter derfor tom. Er dette feil, skriv "
-                    '{"innebygd": true} i %s og start appen på nytt.', PROFILE_FILE)
-    PROFILE.update(innebygd=bool(ok), grunn="navnene i Home Manager stemte" if ok else "nytt anlegg")
+        log.warning("This installation has run an older version, but the names in Home Manager do not match "
+                    "the built-in device list, so the app starts empty. If this is wrong, write "
+                    '{"innebygd": true} to %s and restart the app.', PROFILE_FILE)
+    PROFILE.update(innebygd=bool(ok), grunn="the names in Home Manager matched" if ok else "new installation")
     try:
         with open(PROFILE_FILE, "w", encoding="utf-8") as f:
             json.dump({"innebygd": bool(ok)}, f)
     except OSError as e:
-        log.warning("Klarte ikke lagre %s: %s", PROFILE_FILE, e)
+        log.warning("Could not save %s: %s", PROFILE_FILE, e)
     return bool(ok)
 
 
@@ -2034,11 +2055,11 @@ def clear_builtin_devices():
 
 def apply_profile():
     if decide_profile():
-        log.info("Kjente enheter for dette anlegget er lastet (%s)", PROFILE["grunn"])
+        log.info("Known devices for this installation are loaded (%s)", PROFILE["grunn"])
         merge_seed_cache()
     else:
         clear_builtin_devices()
-        log.info("Nytt anlegg (%s): appen bruker bare enheter du legger til under Enheter på nettsiden",
+        log.info("New installation (%s): the app only uses devices you add under Devices on the web page",
                  PROFILE["grunn"])
 
 
@@ -2055,7 +2076,7 @@ def merge_seed_cache():
     if added:
         cache.update(added)
         xc.save_cache(cache)
-        log.info("La inn %d kjente styre-objekter fra appens startliste", len(added))
+        log.info("Added %d known control objects from the built-in list", len(added))
 
 
 def rebuild_registry():
@@ -2104,7 +2125,7 @@ def on_hm_object(oid, name, fields):
             if not usb_grace(smux, pct):
                 publish_light_state(client, smux, pct)
                 note_change("lys", smux, pct, f"{REG['names'].get(smux, smux)}: {pct} %" if pct else
-                            f"{REG['names'].get(smux, smux)}: av")
+                            f"{REG['names'].get(smux, smux)}: off")
     if oid in REG["light_ids"]:
         level = _num(fields, 2)
         pending = PENDING_CONFIRM.get(oid)
@@ -2115,12 +2136,12 @@ def on_hm_object(oid, name, fields):
                 STATS.bekreftet += 1
                 STATS.responstider.append({"navn": REG["names"].get(oid, str(oid)), "sek": secs,
                                            "tid": time.strftime("%H:%M:%S")})
-            log.info("Lys %s bekreftet %d %% etter %.1fs", REG["names"].get(oid, oid), level, secs)
+            log.info("Light %s confirmed %d %% after %.1fs", REG["names"].get(oid, oid), level, secs)
     if oid in REG["switch_ids"]:
         v = _num(fields, 2)
         if v is not None:
             publish_switch_state(client, oid, v > 0)
-            note_change("bryter", oid, v > 0, f"{REG['names'].get(oid, oid)}: {'på' if v > 0 else 'av'}")
+            note_change("bryter", oid, v > 0, f"{REG['names'].get(oid, oid)}: {'on' if v > 0 else 'off'}")
     # Innganger kan ha fått nytt nummer -- slå opp nøkkelen (se idmap.py)
     fkey = REG["alias"].get(oid, oid) if oid in REG["alias"] else \
         (None if oid in REG["binary_ids"] | set(REG["button_ids"]) else oid)
@@ -2128,7 +2149,7 @@ def on_hm_object(oid, name, fields):
         v = _num(fields, 2)
         if v is not None:
             publish_state(client, binary_sensor_state_topic(fkey), "ON" if v > 0 else "OFF")
-            note_change("alarm", fkey, v > 0, f"{BINARY_NAMES.get(fkey, fkey)}: {'AKTIV' if v > 0 else 'normal'}")
+            note_change("alarm", fkey, v > 0, f"{BINARY_NAMES.get(fkey, fkey)}: {'ACTIVE' if v > 0 else 'normal'}")
     if oid in REG["sensor_ids"]:
         v = _num(fields, 3)
         if v is not None:
@@ -2144,18 +2165,18 @@ def on_hm_object(oid, name, fields):
         code = _num(fields, 2)
         if code is not None and not quiet:
             kode = int(code)
-            log.info("Knapp %s: %s (kode %d)", REG["button_ids"][fkey], KNAPP_KODER.get(kode, "?"), kode)
-            etype = KNAPP_KODER.get(kode, f"kode_{kode}")
+            log.info("Button %s: %s (code %d)", REG["button_ids"][fkey], KNAPP_KODER.get(kode, "?"), kode)
+            etype = KNAPP_KODER.get(kode, f"code_{min(kode, 9)}")
             LAST_BUTTON[fkey] = (etype, time.time())
             web.EVENTS.add(f"{REG['button_ids'][fkey]}: {etype.replace('_', ' ')}", "knapp")
-            client.publish(event_topic(fkey), json.dumps({"event_type": KNAPP_KODER.get(kode, f"kode_{min(kode, 9)}"), "kode": kode}),
+            client.publish(event_topic(fkey), json.dumps({"event_type": etype, "code": kode}),
                            qos=0, retain=False)
     elif name.startswith("IN_") and oid not in REG["alias"] and not quiet:
         RECENT_UNKNOWN[oid] = (name, time.time())
-        log.info("Ukjent knapp/inngang %s (%d) sendte %s -- kan legges til under Verktøy i appen",
+        log.info("Unknown button/input %s (%d) sent %s -- it can be added under Buttons on the web page",
                  name, oid, " ".join(fields))
     if oid in REG["markise_ids"]:
-        mlog.debug("Markise-objekt %s: %s", REG["names"].get(oid, oid), " ".join(fields))
+        mlog.debug("Awning object %s: %s", REG["names"].get(oid, oid), " ".join(fields))
 
 
 # Innganger som har sendt noe, men som ikke er lagt til ennå: {id: (navn, tid)}.
@@ -2187,7 +2208,7 @@ def id_watch():
                 try:
                     changes = IDMAP.verify(SCANNER.objects)
                 except Exception as e:  # noqa: BLE001
-                    log.warning("Klarte ikke sjekke objektnumre: %s", e)
+                    log.warning("Could not check object numbers: %s", e)
                     next_check = time.time() + 600
                     changes = []
                 if changes or IDMAP.expected != names_before:
@@ -2210,8 +2231,8 @@ def housekeeping(client):
                 PENDING_CONFIRM.pop(smux, None)
                 with STATS.lock:
                     STATS.ubekreftet += 1
-                log.info("Lys %s: lampa bekreftet ikke %d %% innen %.0fs (enten treg radio, "
-                         "eller en lampe som ikke rapporterer status)", REG["names"].get(smux, smux),
+                log.info("Light %s: the lamp did not confirm %d %% within %.0fs (slow radio, "
+                         "or a lamp that does not report its status)", REG["names"].get(smux, smux),
                          target, LYS_BEKREFT_S)
         if now - last_diag > 30:
             last_diag = now
@@ -2227,13 +2248,13 @@ class Api:
         now = time.time()
         problems = []
         if not MQTT_STATE["connected"]:
-            problems.append("ikke koblet til MQTT")
+            problems.append("not connected to MQTT")
         if now - HEARTBEAT["poll"] > max(OPTS["poll_interval"], FULL_AVLESNING_S) * 2 + 120:
-            problems.append("polling henger")
+            problems.append("polling is stuck")
         if now - HEARTBEAT["batch"] > 60:
-            problems.append("kommando-traaden henger")
+            problems.append("the command thread is stuck")
         if now - HEARTBEAT["markise"] > 60:
-            problems.append("markise-traaden henger")
+            problems.append("the awning thread is stuck")
         return problems
 
     def status(self):
@@ -2270,11 +2291,11 @@ class Api:
             st = json.loads(cache.get(light_state_topic(smux), "{}") or "{}")
             on = st.get("state") == "ON"
             out.append({"type": "lys", "id": smux, "sone": zone, "navn": name, "på": on,
-                        "tilstand": f"{st.get('brightness', 100)} %" if on else ("av" if st else "?")})
+                        "tilstand": f"{st.get('brightness', 100)} %" if on else ("off" if st else "?")})
         for zone, name, smux in xc.SWITCHES:
             v = cache.get(switch_state_topic(smux))
             out.append({"type": "bryter", "id": smux, "sone": zone, "navn": name, "på": v == "ON",
-                        "tilstand": {"ON": "på", "OFF": "av"}.get(v, "?")})
+                        "tilstand": {"ON": "on", "OFF": "off"}.get(v, "?")})
         for zone, name, smux in xc.MARKISER:
             m = MARKISER_CTRL.markiser[smux]
             out.append({"type": "markise", "id": smux, "sone": zone, "navn": name, "på": m.position > 1,
@@ -2285,14 +2306,14 @@ class Api:
             setp = cache.get(climate_temp_state_topic(smux))
             out.append({"type": "termostat", "id": smux, "sone": zone, "navn": name, "på": False,
                         "temp": cur, "mal": setp,
-                        "tilstand": f"{cur} °C (mål {setp} °C)" if cur else "?"})
+                        "tilstand": f"{cur} °C (target {setp} °C)" if cur else "?"})
         for zone, name, oid in BUTTONS:
             z2, n2 = button_label(zone, name, oid)
             last = LAST_BUTTON.get(oid)
             out.append({"type": "knapp", "id": oid, "sone": z2, "navn": n2, "på": False,
                         "ekstra": oid in extra_ids,
                         "siste": last[0] if last else None, "sek_siden": round(time.time() - last[1]) if last else None,
-                        "tilstand": last[0].replace("_", " ") if last else "ingen trykk ennå"})
+                        "tilstand": last[0].replace("_", " ") if last else "no presses yet"})
         for d in out:
             d.setdefault("ekstra", d["id"] in extra_ids)
         return out
@@ -2312,9 +2333,9 @@ class Api:
 
     def usb_learn(self, body):
         if LEARN["kjorer"]:
-            return {"ok": False, "feil": "læring pågår allerede"}
+            return {"ok": False, "feil": "learning is already running"}
         if STICK is None or not STICK.healthy():
-            return {"ok": False, "feil": "USB-pinnen er ikke tilkoblet (og Lysstyring må være hybrid eller pinne)"}
+            return {"ok": False, "feil": "the USB stick is not connected (and Light control must be hybrid or usb_stick)"}
         wanted = body.get("lys")
         lights = [s for _, _, s in xc.LIGHTS]
         if wanted == "mangler":
@@ -2322,21 +2343,21 @@ class Api:
         elif isinstance(wanted, list):
             lights = [s for s in lights if s in {int(x) for x in wanted}]
         if not lights:
-            return {"ok": False, "feil": "ingen lys å lære"}
+            return {"ok": False, "feil": "no lights to learn"}
         threading.Thread(target=learn_usb_map, args=(lights,), daemon=True, name="usb-laering").start()
         return {"ok": True, "antall": len(lights)}
 
     def usb_map_upload(self, body):
         lys = body.get("lys") if isinstance(body, dict) else None
         if not isinstance(lys, dict):
-            raise ValueError("fila må ha formen {\"lys\": {\"<id>\": [serienr, ...]}}")
+            raise ValueError("the file must look like {\"lys\": {\"<id>\": [serial, ...]}}")
         clean = {}
         for k, v in lys.items():
             if isinstance(v, dict):
                 v = v.get("serienr", [])
             clean[int(k)] = [int(x) for x in v]
         n = len(save_usb_map(clean))
-        log.info("Nytt USB-kart lagret: %d lys har serienumre", n)
+        log.info("New USB map saved: %d lights have dimmer serial numbers", n)
         return {"ok": True, "lys_med_kart": n}
 
     def _read_extra(self):
@@ -2374,7 +2395,7 @@ class Api:
         kind = next((k for k in ("lys", "brytere", "knapper")
                      if any(int(x["id"]) == oid for x in extra.get(k, []))), None)
         if kind is None:
-            return {"ok": False, "feil": "fant ikke enheten blant de som er lagt til fra nettsiden"}
+            return {"ok": False, "feil": "device not found among those added from the web page"}
         extra[kind] = [x for x in extra[kind] if int(x["id"]) != oid]
         self._write_extra(extra)
         self._drop_from_lists(oid)
@@ -2388,7 +2409,7 @@ class Api:
             client.publish(f"{DISCOVERY_PREFIX}/{topic}/config", "", qos=1, retain=True)
             if kind == "brytere":
                 client.publish(f"{DISCOVERY_PREFIX}/light/xcomfort_onoff_{oid}/config", "", qos=1, retain=True)
-        log.info("Fjernet %s fra HA (fra nettsiden)", oid)
+        log.info("Removed %s from HA (from the web page)", oid)
         return {"ok": True}
 
     def update_extra(self, body):
@@ -2407,13 +2428,13 @@ class Api:
                 self._drop_from_lists(oid)
                 load_extras()
                 self._refresh()
-                log.info("Endret %s: %s i %s", oid, item["navn"], item.get("sone", "-"))
+                log.info("Changed %s: %s in %s", oid, item["navn"], item.get("sone", "-"))
                 return {"ok": True}
-        return {"ok": False, "feil": "fant ikke enheten blant de som er lagt til fra nettsiden"}
+        return {"ok": False, "feil": "device not found among those added from the web page"}
 
     def command(self, body):
         kind, smux, value = body.get("type"), int(body.get("id")), str(body.get("value"))
-        log.info("Kommando fra appens nettside: %s %s -> %s", kind, smux, value)
+        log.info("Command from the web page: %s %s -> %s", kind, smux, value)
         if kind == "lys":
             pct = max(0, min(100, int(float(value))))
             payload = {"state": "OFF"} if pct == 0 else {"state": "ON", "brightness": pct}
@@ -2422,10 +2443,10 @@ class Api:
             _queue_command("switch", smux, b"ON" if value.upper() == "ON" else b"OFF")
         elif kind == "markise":
             if value not in ("ut", "inn", "stopp"):
-                return {"ok": False, "feil": "ukjent markise-handling"}
+                return {"ok": False, "feil": "unknown awning action"}
             MARKISER_CTRL.enqueue(smux, value)
         else:
-            return {"ok": False, "feil": "ukjent type"}
+            return {"ok": False, "feil": "unknown type"}
         return {"ok": True}
 
     def scan_start(self):
@@ -2498,7 +2519,7 @@ class Api:
             client = MQTT_STATE["client"]
             if client:
                 publish_discovery(client)
-            log.info("La til fra nettsiden: %s", ", ".join(added))
+            log.info("Added from the web page: %s", ", ".join(added))
         return {"ok": True, "lagt_til": added}
 
     def cache(self):
@@ -2510,18 +2531,18 @@ class Api:
 def main():
     setup_logging(OPTS["log_level"])
     if not str(OPTS["xcomfort_ip"]).strip():
-        log.error("Home Manager IP er ikke fylt inn. Gaa til appens Konfigurasjon-fane, "
-                  "fyll inn IP-adressen til Home Manager (og MQTT-brukernavn/passord), "
-                  "lagre og start appen paa nytt.")
+        log.error("Home Manager IP is not set. Open the app's Configuration tab, "
+                  "enter the IP address of the Home Manager (and the MQTT username/password), "
+                  "save and restart the app.")
         sys.exit(1)
-    log.info("Starter xComfort MQTT-bro v%s (Home Manager %s:%s, MQTT %s:%s, loggnivaa %s)",
+    log.info("Starting xComfort MQTT bridge v%s (Home Manager %s:%s, MQTT %s:%s, log level %s)",
              BRIDGE_VERSION, OPTS["xcomfort_ip"], OPTS["xcomfort_port"],
              OPTS["mqtt_host"], OPTS["mqtt_port"], OPTS["log_level"])
-    log.info("Markiser: posisjon=%s, kjoeretider=%s, pause=%.1fs, dobbel stopp=%s, gjenta bevegelse=%s",
-             OPTS["markise_posisjon"],
+    log.info("Awnings: position=%s, runtimes=%s, gap=%.1fs, double stop=%s, repeat move=%s",
+             OPTS["awning_position"],
              {m.name: m.runtime for m in MARKISER_CTRL.markiser.values()},
-             OPTS["markise_pause_mellom_kommandoer"], OPTS["markise_dobbel_stopp"],
-             OPTS["markise_gjenta_bevegelse"])
+             OPTS["awning_command_gap"], OPTS["awning_double_stop"],
+             OPTS["awning_repeat_move"])
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="xcomfort-bridge")
     MQTT_STATE["client"] = client
@@ -2540,13 +2561,13 @@ def main():
     start_usb_stick()
     load_extras()
     ids = rebuild_registry()
-    if OPTS["hurtig_status"]:
+    if OPTS["instant_status"]:
         LINK = hm_link.HMLink(on_hm_object, on_hm_ack, on_hm_other)
         LINK.subscribe(ids)
         threading.Thread(target=LINK.run, daemon=True, name="lytter").start()
-        log.info("Hurtig status er PAA: lytter paa %d objekter i Home Manager", len(ids))
+        log.info("Instant status is ON: listening to %d objects in Home Manager", len(ids))
     else:
-        log.info("Hurtig status er AV: bruker bare polling hvert %ss", OPTS["poll_interval"])
+        log.info("Instant status is OFF: polling every %ss only", OPTS["poll_interval"])
     threading.Thread(target=housekeeping, args=(client,), daemon=True, name="husholdning").start()
     threading.Thread(target=id_watch, daemon=True, name="idsjekk").start()
     web.start(Api(), HEALTH_PORT)
@@ -2554,7 +2575,7 @@ def main():
     threading.Thread(target=command_batch_worker, args=(client,), daemon=True, name="bolk").start()
     threading.Thread(target=MARKISER_CTRL.run, args=(client,), daemon=True, name="markise").start()
 
-    log.info("Kobler til MQTT-megler paa %s:%s ...", OPTS["mqtt_host"], OPTS["mqtt_port"])
+    log.info("Connecting to the MQTT broker at %s:%s ...", OPTS["mqtt_host"], OPTS["mqtt_port"])
     client.connect_async(OPTS["mqtt_host"], OPTS["mqtt_port"], keepalive=60)
     try:
         client.loop_forever(retry_first_connection=True)

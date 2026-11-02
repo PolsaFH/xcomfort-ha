@@ -1,25 +1,26 @@
 """
-lag_usb_kart.py
+make_usb_map.py
 ===============
-VALGFRITT. Appen kan finne dette selv (nettsiden -> USB-pinne -> «Finn
-dimmere»). Dette skriptet er for deg som heller vil lage USB-kartet fra
-MRF-eksporten: hvilke dimmere (radio-serienumre) som hører til hvert lys.
+OPTIONAL. The app can find this by itself (web page -> USB stick -> «Find
+dimmers»). This script is for those who would rather build the USB map from
+the MRF export: which dimmers (radio serial numbers) belong to each light.
 
-Bruker to filer:
-  1. MRF-eksporten (Fil -> Oversikt prosjektkonfigurasjon -> Eksporter).
-     Skriptet forventer norsk MRF (komponenttypen «Dimmeaktuator»).
-  2. En backup av xSetup-prosjektet (JSON med "setup" -> "controllers" og
-     "devices", slik xSetup/eoptHome-skyen leverer det).
+Uses two files:
+  1. The MRF export (File -> Project configuration overview -> Export).
+     The script expects a Norwegian MRF (component type «Dimmeaktuator»);
+     add your language's name for dimming actuators to DIMMER_TYPES.
+  2. A backup of the xSetup project (JSON with "setup" -> "controllers" and
+     "devices", as delivered by xSetup / the eoptHome cloud).
 
-MRF-eksporten inneholder MRF-passordet i klartekst. Skriptet leser bare
-komponentlista og forbindelsene, og skriver ALDRI passordet videre. Ikke
-legg eksporten i et offentlig repo.
+The MRF export contains the MRF password in plain text. This script only
+reads the component list and the links, and NEVER writes the password
+anywhere. Do not put the export in a public repository.
 
-Kjøring:
-    python lag_usb_kart.py <MRF-eksport.txt> <xsetup_backup.json> [serienr-til-hovedkontroller]
+Usage:
+    python make_usb_map.py <MRF-export.txt> <xsetup_backup.json> [serial-of-main-controller]
 
-Resultat: usb_kart.json i mappen du står i. Last den opp i appen under
-USB-pinne -> «Last opp et kart fra fil».
+Result: usb_kart.json in the current folder. Upload it in the app under
+USB stick -> «Upload a map from a file».
 """
 
 import collections
@@ -27,7 +28,7 @@ import json
 import re
 import sys
 
-DIMMER_TYPES = ("Dimmeaktuator",)  # ikke analoge aktuatorer (f.eks. shunt til varme)
+DIMMER_TYPES = ("Dimmeaktuator",)  # not analogue actuators (e.g. heating valves)
 
 
 def read_mrf(path):
@@ -56,13 +57,13 @@ def main():
         sys.exit(__doc__)
     comp, links = read_mrf(sys.argv[1])
     setup = json.load(open(sys.argv[2], encoding="utf-8"))["setup"]
-    # Hovedkontrolleren er den første i xSetup; MRF kaller den «Master».
+    # The main controller is the first one in xSetup; MRF calls it «Master».
     ctrls = setup["controllers"]
     roles = {}
     for i, c in enumerate(ctrls):
         cid = c["controllerId"]["id"] if isinstance(c["controllerId"], dict) else c["controllerId"]
         roles[cid] = "Master" if i == 0 else "Slave"
-    if len(sys.argv) > 3:  # valgfritt: serienummer (MAC) til hovedkontrolleren, f.eks. 9802840128B2
+    if len(sys.argv) > 3:  # optional: serial (MAC) of the main controller
         for c in ctrls:
             cid = c["controllerId"]["id"] if isinstance(c["controllerId"], dict) else c["controllerId"]
             roles[cid] = "Master" if c.get("serial") == sys.argv[3] else "Slave"
@@ -81,10 +82,10 @@ def main():
         elif acts:
             skipped.append(d.get("name"))
     json.dump({"lys": out}, open("usb_kart.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print(f"Laget usb_kart.json med {len(out)} lys.")
+    print(f"Created usb_kart.json with {len(out)} lights.")
     for k, v in sorted(out.items(), key=lambda kv: kv[1]["navn"] or ""):
         print(f"  {v['navn']:<28} -> {', '.join(v['dimmere'])}")
-    print("Sjekk at navnene passer sammen før du laster den opp i appen.")
+    print("Check that the names match before you upload it to the app.")
 
 
 if __name__ == "__main__":

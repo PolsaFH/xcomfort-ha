@@ -1,4 +1,34 @@
-# Endringslogg – xComfort MQTT-bro
+# Changelog – xComfort MQTT Bridge
+
+From 3.0.0 the changelog is written in English. Older entries are in Norwegian.
+
+## 3.0.0 (2026-11-03)
+
+Everything you see is now in English, so the app can be used outside Norway. Norwegian is kept where Home
+Assistant supports it.
+
+### Breaking changes
+- **Button event types are renamed.** Update automations that use them:
+
+  | Before | Now |
+  |---|---|
+  | `kort_opp` / `kort_ned` | `short_up` / `short_down` |
+  | `langt_opp` / `langt_ned` | `long_up` / `long_down` |
+  | `langt_opp_slipp` / `langt_ned_slipp` | `long_up_release` / `long_down_release` |
+  | `kode_6` … `kode_9` | `code_6` … `code_9` |
+
+  The event attribute `kode` is now called `code`.
+- **Settings have new names** (e.g. `lysstyring` is now `light_control`, and its value `pinne` is now
+  `usb_stick`). Home Assistant does not carry the old values over, so **check the Configuration tab after
+  updating**. The defaults are the same as before.
+- Diagnostic entities and the «Reset awnings» button have English names. Entity IDs are unchanged.
+
+### New
+- The web page, log messages and setting descriptions are in English.
+- Setting descriptions in Norwegian (shown automatically when Home Assistant is set to Norwegian).
+- README in English, with a full Norwegian version (`README.no.md`).
+- MIT license.
+- The USB map tool is now `tools/make_usb_map.py`.
 
 ## 2.8.0 (2026-11-02)
 

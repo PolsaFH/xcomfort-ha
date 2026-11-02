@@ -1,23 +1,23 @@
-# xComfort MQTT-bro
+# xComfort MQTT Bridge
 
-Lokal styring av Eaton / Sensio xComfort via Home Manager. Ingen sky.
+Local control of Eaton / Sensio xComfort through the Home Manager. No cloud.
 
-## Kom i gang
+## Getting started
 
-1. Installer og start **Mosquitto broker**, og legg til **MQTT**-integrasjonen.
-2. Lag en egen Home Assistant-bruker til appen, f.eks. `xcomfort`.
-3. Under **Konfigurasjon**: fyll inn **Home Manager IP**, **MQTT-brukernavn** og **MQTT-passord**.
-4. Under **Info**: slå på **Start ved oppstart**, **Watchdog** og **Vis i sidepanelet**, og trykk **Start**.
-5. Åpne **xComfort** i sidepanelet og følg veiviseren: **Søk**, velg enheter, gi dem navn og rom.
+1. Install and start the **Mosquitto broker** app, and add the **MQTT** integration.
+2. Create a separate Home Assistant user for the app, e.g. `xcomfort`.
+3. On the **Configuration** tab: fill in **Home Manager IP**, **MQTT username** and **MQTT password**.
+4. On the **Info** tab: turn on **Start on boot**, **Watchdog** and **Show in sidebar**, and press **Start**.
+5. Open **xComfort** in the sidebar and follow the guide: **Search**, choose your devices, give them names and rooms.
 
-## USB-pinne (valgfritt)
+## USB stick (optional)
 
-Sett xComfort-pinnen **CKOZ-00/13** i Home Assistant-maskinen. Åpne **USB-pinne** på nettsiden og trykk
-**Finn dimmere**. Lysene styres da direkte over radio, med Home Manager som reserve.
+Plug the xComfort stick **CKOZ-00/13** into the Home Assistant machine. Open **USB stick** on the web page and
+press **Find dimmers**. The lights are then controlled directly over radio, with the Home Manager as fallback.
 
-## Hjelp
+## Help
 
-Full dokumentasjon, feilsøking og eksempler:
+Full documentation (English and Norwegian), troubleshooting and examples:
 https://github.com/PolsaFH/xcomfort-ha
 
-Fant du en feil? Opprett en issue på GitHub, gjerne med loggen fra nettsiden (Logg → Last ned).
+Found a bug? Open an issue on GitHub, ideally with the log from the web page (Log → Download).
