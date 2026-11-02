@@ -12,9 +12,9 @@ Uses two files:
   2. A backup of the xSetup project (JSON with "setup" -> "controllers" and
      "devices", as delivered by xSetup / the eoptHome cloud).
 
-The MRF export contains the MRF password in plain text. This script only
-reads the component list and the links, and NEVER writes the password
-anywhere. Do not put the export in a public repository.
+The MRF export contains sensitive information about your installation. This
+script only reads the component list and the links, and writes nothing but
+the map. Keep the export private and out of public repositories.
 
 Usage:
     python make_usb_map.py <MRF-export.txt> <xsetup_backup.json> [serial-of-main-controller]

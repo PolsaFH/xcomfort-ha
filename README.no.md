@@ -56,12 +56,12 @@
 
 ## Hvorfor
 
-xComfort er et solid radiobasert anlegg, men det er låst til eoptHome-appen og Eatons sky. Det betyr treg
-respons, ingen ordentlig kobling til resten av hjemmet, og at alt stopper hvis skyen gjør det.
+xComfort er et solid og pålitelig radioanlegg med egen app og skytjeneste. Mange vil også at det skal virke
+sammen med resten av smarthjemmet, og mange foretrekker å holde alt på det lokale nettverket.
 
-Denne appen snakker direkte med **Home Manager** på ditt lokale nettverk, akkurat som eoptHome-appen gjør selv.
-Protokollen er kartlagt fra bunnen av. Resultatet er at xComfort blir en helt vanlig del av Home Assistant: i
-dashbord, automasjoner, stemmestyring og Google Home eller Apple Home.
+Denne appen kobler **Home Manager** til Home Assistant over ditt lokale nettverk, på samme måte som eoptHome-appen
+snakker med den. Resultatet er at xComfort blir en naturlig del av Home Assistant: i dashbord, automasjoner,
+stemmestyring og Google Home eller Apple Home. eoptHome-appen og alt annet du bruker i dag virker som før.
 
 **Hvilken kontroller?** Appen er laget for **Sensio X1 / xComfort Home Manager** som brukes med eoptHome og
 xSetup. Har du Eatons nyere **xComfort Bridge** eller den eldre **Smart Home Controller (SHC)**, finnes det
@@ -315,20 +315,20 @@ Kjør gjerne **Devices → Search again** etterpå, og last ned en ny sikkerhets
   **Devices → Find an object**, så legger vi det til.
 - **Testet på ett anlegg** (Sensio X1 / Home Manager med tilleggskontroller). Andre oppsett skal virke, men er
   ikke bekreftet ennå.
-- **USB-pinnen** er testet med CKOZ-00/13. Radioprotokollen er kartlagt ved å lytte på MRF.
+- **USB-pinnen** er testet med CKOZ-00/13, og bruker de samme kommandoene som MRF bruker når du tester et lys.
 - Appen er ikke laget av eller støttet av Eaton.
 
 ---
 
 ## Sikkerhet
 
-- Protokollen mot Home Manager er **ukryptert** (slik Eaton har laget den). Hold Home Manager på et lukket
-  hjemmenett og **aldri** åpne port 10023 mot internett.
-- Bruk en egen MQTT-bruker til appen.
+- Home Manager er laget for å stå på et privat hjemmenett, og appen snakker bare med den der. Hold det slik: ikke
+  gjør Home Manager tilgjengelig fra internett, for eksempel med portviderekobling i ruteren.
+- Bruk en egen MQTT-bruker til appen, og hold Home Assistant oppdatert.
 - Appen gjør ingenting med anlegget ditt før du har valgt enheter. Den kjenner igjen anlegget den ble laget på ved
   å sjekke navnene i Home Manager, og bruker ellers bare det du legger til selv.
-- **Ikke last opp private filer.** MRF-eksporter (`Anlagenkonfiguration*.txt`) inneholder MRF-passordet i
-  klartekst. `.gitignore` stopper de vanligste, men sjekk alltid.
+- **Hold prosjektfilene dine private.** MRF-eksporter og xSetup-backuper beskriver hele anlegget ditt. Ikke del
+  dem eller last dem opp noe offentlig sted. `.gitignore` i dette repoet stopper de vanligste.
 
 ---
 

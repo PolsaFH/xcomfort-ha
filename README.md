@@ -61,12 +61,13 @@
 
 ## Why
 
-xComfort is a solid radio based system, but it is locked to the eoptHome app and Eaton's cloud. That means slow
-response, no proper connection to the rest of your home, and everything stops when the cloud does.
+xComfort is a solid, reliable radio system with its own app and cloud service. Many people also want it to work
+together with the rest of their smart home, and many prefer to keep everything on the local network.
 
-This app talks directly to the **Home Manager** on your local network, exactly like the eoptHome app does. The
-protocol was mapped from scratch. The result is that xComfort becomes a normal part of Home Assistant: in
-dashboards, automations, voice control and Google Home or Apple Home.
+This app connects the **Home Manager** to Home Assistant over your local network, the same way the eoptHome app
+talks to it. The result is that xComfort becomes a natural part of Home Assistant: in dashboards, automations,
+voice control and Google Home or Apple Home. The eoptHome app and everything else you use today keep working as
+before.
 
 **Which controller?** The app is built for the **Sensio X1 / xComfort Home Manager** used with eoptHome and
 xSetup (common in Norway). If you have Eaton's newer **xComfort Bridge** or the older **Smart Home Controller
@@ -325,20 +326,21 @@ To be honest, this is what remains:
   **Devices → Find an object**, and we will add it.
 - **Tested on one installation** (Sensio X1 / Home Manager with an extra controller). Other setups should work,
   but are not confirmed yet.
-- **The USB stick** is tested with the CKOZ-00/13. The radio protocol was mapped by listening to MRF.
+- **The USB stick** is tested with the CKOZ-00/13, and uses the same commands MRF uses when you test a light.
 - This app is not made or supported by Eaton.
 
 ---
 
 ## Security
 
-- The protocol to the Home Manager is **unencrypted** (that is how Eaton made it). Keep the Home Manager on a
-  closed home network and **never** open port 10023 to the internet.
-- Use a separate MQTT user for the app.
+- The Home Manager is designed to sit on a private home network, and this app talks to it on that network only.
+  Keep it that way: don't make the Home Manager reachable from the internet, for example through port forwarding
+  in your router.
+- Use a separate MQTT user for the app, and keep Home Assistant up to date.
 - The app does nothing to your installation until you have chosen devices. It recognises the installation it
   was built on by checking the names in the Home Manager, and otherwise only uses what you add yourself.
-- **Don't upload private files.** MRF exports (`Anlagenkonfiguration*.txt`) contain the MRF password in plain
-  text. `.gitignore` stops the most common ones, but always check.
+- **Keep your project files private.** MRF exports and xSetup backups describe your whole installation. Don't
+  share them or upload them anywhere public. `.gitignore` in this repository stops the most common ones.
 
 ---
 
@@ -379,10 +381,9 @@ The Home Manager sends changes to **all** open connections.
 
 ### The USB stick
 
-HID device `188A:1102`, 62 byte frames: `5A <length> <code> <data> A5`. Radio commands use code `1B` and are
-addressed directly to the dimmer's serial number, with CRC-16/Kermit. `50` = on, `51` = off,
-`5A 01 00 <level 0-255>` = set level. The dimmer acknowledges to the stick's address (128). Details in
-[`usbstick.py`](xcomfort_bridge/usbstick.py).
+The app uses the stick the same way MRF does when you test a light: it sends on, off and set level commands to a
+dimmer and waits for the dimmer's acknowledgement. Only dimmers that are part of your own installation and listed
+in the USB map are ever addressed. See [`usbstick.py`](xcomfort_bridge/usbstick.py).
 
 ### Which installation?
 
