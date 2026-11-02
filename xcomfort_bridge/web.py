@@ -127,10 +127,14 @@ def make_handler(api):
                     return self._send(200, api.command(body))
                 if path == "/api/scan/start":
                     return self._send(200, api.scan_start())
+                if path == "/api/extra/update":
+                    return self._send(200, api.update_extra(body))
                 if path == "/api/extra/remove":
                     return self._send(200, api.remove_extra(body))
                 if path == "/api/extra":
                     return self._send(200, api.add_extra(body))
+                if path == "/api/usb/laer":
+                    return self._send(200, api.usb_learn(body))
                 if path == "/api/usb/kart":
                     return self._send(200, api.usb_map_upload(body))
             except Exception as e:  # noqa: BLE001

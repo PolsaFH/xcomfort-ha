@@ -32,6 +32,7 @@ svg.i{width:20px;height:20px;fill:currentColor;flex:none}
 .pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.ok .d{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 25%,transparent)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}.pill.warn .d{background:var(--warn)}
 .pill.err{background:var(--err-soft);color:var(--err)}.pill.err .d{background:var(--err)}
+.pill.inl{margin:0}
 nav.tabs{max-width:1180px;margin:0 auto;padding:8px 14px 0;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
 nav.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:9px 12px 11px;color:var(--mut);cursor:pointer;display:flex;gap:7px;align-items:center;white-space:nowrap;font-weight:500}
 nav.tabs button svg{width:18px;height:18px}
@@ -43,26 +44,38 @@ section[hidden]{display:none}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
 .card h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
 .card h2 .sub{margin-left:auto;font-weight:400;font-size:12px;color:var(--mut)}
+.card p:first-of-type{margin-top:0}
 .grid{display:grid;gap:14px}
 .g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
 .g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.mt{margin-top:14px}
 .muted{color:var(--mut)}
 .small{font-size:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .btn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 12px;cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:.15s}
 .btn:hover{border-color:var(--acc);color:var(--acc)}
 a.btn{text-decoration:none;color:var(--fg)}
 .btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}.btn.pri:hover{filter:brightness(1.08);color:#fff}
 .btn.ghost{background:transparent}
 .btn.danger:hover{border-color:var(--err);color:var(--err)}
+.btn.icon{padding:6px;border-color:transparent;background:transparent;color:var(--mut)}
+.btn.icon svg{width:17px;height:17px}
 .btn:disabled{opacity:.5;cursor:default}
 .seg{display:inline-flex;background:var(--chip);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
 .seg button{border:0;background:none;padding:6px 11px;border-radius:8px;cursor:pointer;color:var(--mut);font-weight:500}
 .seg button.on{background:var(--card);color:var(--fg);box-shadow:var(--shadow)}
 input[type=search],input[type=text]{padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit;min-width:0}
 input[type=search]:focus,input[type=text]:focus{outline:2px solid var(--acc-soft);border-color:var(--acc)}
+input.sm{padding:6px 9px;font-size:13px}
 .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .toolbar input[type=search]{flex:1;max-width:340px}
 .empty{padding:22px;text-align:center;color:var(--mut)}
+.tag{display:inline-block;background:var(--chip);border-radius:6px;padding:1px 7px;font-size:12px;font-family:ui-monospace,Consolas,monospace}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t th{text-align:left;color:var(--mut);font-weight:600;font-size:12px;padding:6px 8px;border-bottom:1px solid var(--line)}
+table.t td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t tr:last-child td{border-bottom:0}
+.mono{font-family:ui-monospace,Consolas,monospace;word-break:break-all}
 /* hjem */
 .hero{display:flex;gap:16px;align-items:center;padding:20px}
 .hero .big-i{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;flex:none}
@@ -76,6 +89,12 @@ input[type=search]:focus,input[type=text]:focus{outline:2px solid var(--acc-soft
 .kpi .val{font-size:26px;font-weight:700;margin-top:6px;letter-spacing:-.02em}
 .kpi .val small{font-size:14px;font-weight:500;color:var(--mut)}
 .kpi .hint{font-size:12px;color:var(--mut);margin-top:2px}
+.welcome{border-color:var(--acc);background:linear-gradient(135deg,var(--acc-soft),var(--card) 60%)}
+.welcome h2{font-size:18px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:12px 0 4px}
+.step{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;gap:10px}
+.step .n{width:28px;height:28px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-weight:700;flex:none}
+.step.done .n{background:var(--ok)}
 .feed{display:flex;flex-direction:column;max-height:420px;overflow:auto}
 .ev{display:flex;gap:10px;align-items:center;padding:9px 2px;border-bottom:1px solid var(--line)}
 .ev:last-child{border-bottom:0}
@@ -109,14 +128,15 @@ input[type=search]:focus,input[type=text]:focus{outline:2px solid var(--acc-soft
 .room-hd .cnt{color:var(--mut);font-size:12px}
 .room-hd .btn{margin-left:auto}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow);transition:.2s}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow);transition:.2s;position:relative}
 .tile .top{all:unset;display:flex;align-items:center;gap:10px;cursor:pointer}
 .tile .ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:var(--chip);color:var(--mut);flex:none;transition:.2s}
 .tile.on{border-color:color-mix(in srgb,var(--on) 45%,var(--line))}
 .tile.on .ic{background:var(--on-soft);color:var(--on)}
-.tile .nm{font-weight:600;line-height:1.25}
+.tile .nm{font-weight:600;line-height:1.25;padding-right:22px}
 .tile .st{font-size:12px;color:var(--mut)}
 .tile.static .top{cursor:default}
+.tile .edit{position:absolute;top:6px;right:6px}
 input[type=range]{width:100%;accent-color:var(--on);margin:0}
 .tile .row3{display:flex;gap:6px}.tile .row3 .btn{flex:1;justify-content:center;padding:6px}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
@@ -128,33 +148,49 @@ input[type=range]{width:100%;accent-color:var(--on);margin:0}
 .btnrow .ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--acc-soft);color:var(--acc);flex:none;transition:.3s}
 .btnrow.pressed .ic{background:var(--acc);color:#fff;transform:scale(1.08)}
 .btnrow .tx{flex:1;min-width:0}
-.tag{display:inline-block;background:var(--chip);border-radius:6px;padding:1px 7px;font-size:12px;font-family:ui-monospace,Consolas,monospace}
 .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
 .legend div{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px}
+/* enheter */
+.progress{height:10px;background:var(--chip);border-radius:6px;overflow:hidden;margin:10px 0 6px}
+.progress>div{height:100%;background:linear-gradient(90deg,var(--acc),#7c3aed);transition:width .5s}
+.item{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.item:last-child{border-bottom:0}
+.item .tx{flex:1;min-width:160px}
+.item input[type=text]{width:150px}
+.cand-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.cand-hd h3{margin:0;font-size:14px;flex:1}
+/* usb */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px}
+.stat{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stat b{display:block;font-size:20px;letter-spacing:-.02em}
+.stat span{font-size:12px;color:var(--mut)}
+details.sub{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+details.sub summary{cursor:pointer;color:var(--mut);font-weight:500}
 /* logg */
-.logwrap{background:var(--card);border:1px solid var(--line);border-radius:var(--r);height:66vh;overflow:auto;box-shadow:var(--shadow)}
+.logwrap{background:var(--card);border:1px solid var(--line);border-radius:var(--r);height:62vh;overflow:auto;box-shadow:var(--shadow)}
 .logline{display:flex;gap:10px;padding:5px 12px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);font:12px/1.5 ui-monospace,Consolas,monospace}
 .logline .lv{flex:none;width:62px;font-weight:700}
 .logline .lv.INFO{color:var(--acc)}.logline .lv.WARNING{color:var(--warn)}.logline .lv.ERROR{color:var(--err)}.logline .lv.DEBUG{color:var(--mut)}
 .logline.WARNING{background:color-mix(in srgb,var(--warn-soft) 60%,transparent)}
 .logline.ERROR{background:color-mix(in srgb,var(--err-soft) 70%,transparent)}
 .logline .m{white-space:pre-wrap;word-break:break-word}
-/* verktøy */
-.progress{height:10px;background:var(--chip);border-radius:6px;overflow:hidden;margin:10px 0 6px}
-.progress>div{height:100%;background:linear-gradient(90deg,var(--acc),#7c3aed);transition:width .5s}
-.item{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
-.item:last-child{border-bottom:0}
-.item .tx{flex:1;min-width:0}
 details.card summary{cursor:pointer;font-weight:600;list-style:none;display:flex;align-items:center;gap:8px}
 details.card summary::-webkit-details-marker{display:none}
 details.card[open] summary{margin-bottom:12px}
-.raw{height:45vh;overflow:auto;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:8px 10px;font:12px/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap}
+.raw{height:40vh;overflow:auto;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:8px 10px;font:12px/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap}
+/* dialog */
+dialog{border:1px solid var(--line);border-radius:var(--r);background:var(--card);color:var(--fg);padding:18px;width:min(92vw,380px);box-shadow:0 20px 50px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(10,14,20,.45)}
+dialog h3{margin:0 0 12px}
+dialog label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 0 4px}
+dialog input{width:100%}
+dialog .row{margin-top:16px;justify-content:flex-end}
 /* toast */
 #toasts{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:20;width:min(92vw,420px)}
 .toast{background:var(--fg);color:var(--bg);padding:11px 14px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.2);animation:up .25s ease-out;font-weight:500}
 .toast.err{background:var(--err);color:#fff}
 @keyframes up{from{transform:translateY(10px);opacity:0}}
-@media (max-width:600px){main{padding:12px}.bar{padding:10px 12px 0}.pill{margin-left:0}.hero{padding:16px}.tiles{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
+@media (max-width:600px){main{padding:12px}.bar{padding:10px 12px 0}.pill{margin-left:0}.hero{padding:16px}.tiles{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}.item input[type=text]{width:100%}}
 </style>
 </head>
 <body>
@@ -168,20 +204,22 @@ details.card[open] summary{margin-bottom:12px}
     <button data-t="hjem" class="on"><svg class="i" viewBox="0 0 24 24"><path d="M12 3 2 11h3v9h5v-6h4v6h5v-9h3z"/></svg>Hjem</button>
     <button data-t="rom"><svg class="i" viewBox="0 0 24 24"><path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>Rom</button>
     <button data-t="knapper"><svg class="i" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>Knapper <span id="nybadge" class="badge" hidden></span></button>
+    <button data-t="enheter"><svg class="i" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>Enheter</button>
+    <button data-t="usb"><svg class="i" viewBox="0 0 24 24"><path d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.1A2 2 0 1 0 6 11v2a2 2 0 0 0 2 2h3v3.1a2.5 2.5 0 1 0 2 0V15h3a2 2 0 0 0 2-2v-2h1V7z"/></svg>USB-pinne</button>
     <button data-t="logg"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h10v2H4z"/></svg>Logg</button>
-    <button data-t="verktoy"><svg class="i" viewBox="0 0 24 24"><path d="M22.7 19 13.6 9.9a6.4 6.4 0 0 0-7.6-8.6l4 4-2.8 2.8-4-4a6.4 6.4 0 0 0 8.6 7.6l9.1 9.1z"/></svg>Verktøy</button>
   </nav>
 </div>
 
 <main>
 <!-- HJEM -->
 <section id="hjem">
+  <div id="welcome"></div>
   <div class="card hero" id="hero"><div class="big-i" id="heroi"></div><div><h1 id="herot">Kobler til …</h1><p id="herop"></p></div></div>
-  <div class="grid g4" style="margin-top:14px" id="kpis"></div>
-  <div class="grid g2" style="margin-top:14px">
+  <div class="grid g4 mt" id="kpis"></div>
+  <div class="grid g2 mt">
     <div class="card"><h2>Hva skjer i huset <span class="sub">oppdateres med en gang</span></h2><div class="feed" id="feed"><div class="empty">Ingenting ennå. Trykk på en bryter, så dukker det opp her.</div></div></div>
     <div class="grid" style="align-content:start">
-      <div class="card"><h2>Markiser</h2><div id="blinds"></div></div>
+      <div class="card" id="blindcard" hidden><h2>Markiser</h2><div id="blinds"></div></div>
       <div class="card"><h2>Responstid lys <span class="sub">fra kommando til lampa svarer</span></h2><div id="chart"></div></div>
     </div>
   </div>
@@ -194,7 +232,7 @@ details.card[open] summary{margin-bottom:12px}
     <div class="seg" id="typer">
       <button data-v="" class="on">Alt</button><button data-v="lys">Lys</button><button data-v="bryter">Brytere</button><button data-v="markise">Markiser</button><button data-v="termostat">Varme</button>
     </div>
-    <label class="small muted" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="baretpa"> Bare det som er på</label>
+    <label class="small muted row" style="gap:6px"><input type="checkbox" id="baretpa"> Bare det som er på</label>
   </div>
   <div class="chips" id="romchips" style="margin-bottom:14px"></div>
   <div id="rooms"></div>
@@ -204,8 +242,8 @@ details.card[open] summary{margin-bottom:12px}
 <section id="knapper" hidden>
   <div id="nyknapper"></div>
   <div class="card"><h2>Knapper i Home Assistant <span class="sub">lyser opp når noen trykker</span></h2><div id="btnlist"></div></div>
-  <div class="card" style="margin-top:14px"><h2>Slik bruker du knappene i automasjoner</h2>
-    <p class="muted" style="margin-top:0">Hver knapp er en hendelses-enhet i HA (for eksempel <span class="tag">event.stue_brstue1</span>). Lag en automasjon med utløseren <b>Hendelse mottatt</b>, velg knappen og hvilken type trykk:</p>
+  <div class="card mt"><h2>Slik bruker du knappene i automasjoner</h2>
+    <p class="muted">Hver knapp er en hendelses-enhet i Home Assistant. Lag en automasjon med utløseren <b>Enhet</b> eller <b>Tilstand</b> på knappen, og velg hvilken type trykk:</p>
     <div class="legend">
       <div><span class="tag">kort_opp</span><br><span class="muted">kort trykk opp</span></div>
       <div><span class="tag">kort_ned</span><br><span class="muted">kort trykk ned</span></div>
@@ -214,6 +252,49 @@ details.card[open] summary{margin-bottom:12px}
       <div><span class="tag">langt_ned</span><br><span class="muted">holder inne ned</span></div>
       <div><span class="tag">langt_ned_slipp</span><br><span class="muted">slipper etter langt ned</span></div>
     </div>
+  </div>
+</section>
+
+<!-- ENHETER -->
+<section id="enheter" hidden>
+  <div class="card"><h2><svg class="i" viewBox="0 0 24 24"><path d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 9.5 16a6.5 6.5 0 0 0 4.2-1.6l.3.3v.8l5 5 1.5-1.5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>1. Søk etter enheter i Home Manager</h2>
+    <p class="muted">Appen går gjennom alt Home Manager har og finner dimbare lys, av/på-brytere og knapper. Det tar 10–20 minutter og påvirker ikke radioen, så du kan lukke siden imens. Kjør det på nytt etter endringer i MRF eller xSetup.</p>
+    <div id="scanstat"></div>
+  </div>
+  <div class="card mt" id="kandcard"><h2><svg class="i" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>2. Velg hva som skal inn i Home Assistant</h2>
+    <p class="muted">Gi hver enhet et navn og et rom. Rommet blir en egen enhet i Home Assistant, så lysene havner pent sortert. Du kan endre navn og rom senere med blyanten under <b>Rom</b>.</p>
+    <div id="kand"></div>
+  </div>
+  <div class="grid g2 mt">
+    <div class="card"><h2>Finn et objekt i Home Manager</h2>
+      <input id="objsok" type="search" placeholder="Navn eller nummer, f.eks. «stue» eller «BR» …" style="width:100%">
+      <div id="objres" style="margin-top:10px"></div>
+    </div>
+    <div class="card"><h2>Sikkerhetskopi</h2>
+      <p class="muted">Last ned det appen vet om anlegget ditt. Fint å ha før du endrer noe i xSetup eller MRF.</p>
+      <div class="row"><a class="btn" href="api/cache" download="xcomfort_object_cache.json">Styre-objekter</a><a class="btn" href="api/scan/all" download="hm_objekter.json">Alle objekter</a></div>
+    </div>
+  </div>
+</section>
+
+<!-- USB -->
+<section id="usb" hidden>
+  <div class="card"><h2><svg class="i" viewBox="0 0 24 24"><path d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.1A2 2 0 1 0 6 11v2a2 2 0 0 0 2 2h3v3.1a2.5 2.5 0 1 0 2 0V15h3a2 2 0 0 0 2-2v-2h1V7z"/></svg>USB-pinne <span class="sub">valgfritt</span></h2>
+    <p class="muted">Sett xComfort-pinnen <b>CKOZ-00/13</b> (den samme som MRF bruker) i maskinen som kjører Home Assistant. Da sendes lyskommandoer rett ut på radio, og lysene reagerer med en gang. Svarer ikke en dimmer, tar Home Manager over av seg selv.</p>
+    <div id="usbstat"></div>
+  </div>
+  <div class="card mt"><h2>USB-kart <span class="sub">hvilke dimmere hvert lys styrer</span></h2>
+    <p class="muted">Pinnen må vite radio-serienumrene til dimmerne bak hvert lys. Appen kan finne dem selv: den sender en kommando via Home Manager til ett lys om gangen og lytter på hvilke dimmere som får den. Lysene endrer seg ikke synlig. Tar omtrent 10 sekunder per lys.</p>
+    <div id="usblearn"></div>
+    <details class="sub"><summary>Vis kartet</summary><div id="usbkart" style="margin-top:10px"></div></details>
+    <details class="sub"><summary>Last opp et kart fra fil</summary>
+      <p class="small muted">For deg som har laget kartet selv, f.eks. med <span class="tag">verktoy/lag_usb_kart.py</span> fra MRF-eksporten.</p>
+      <label class="btn" style="cursor:pointer">Velg fil (.json)<input type="file" id="usbfil" accept=".json,application/json" hidden></label>
+    </details>
+  </div>
+  <div class="card mt"><h2>Feilsøking</h2>
+    <details class="sub" style="border:0;padding:0;margin:0" id="usbframes"><summary>Hva pinnen hører</summary><pre class="small mono" id="usbraw" style="white-space:pre-wrap;margin:8px 0 0"></pre></details>
+    <details class="sub" id="usbradio"><summary>Radiomeldinger til og fra dimmerne</summary><p class="small muted">Hva Home Manager sender til hver dimmer og hva dimmerne svarer, sammen med siste kommando fra HA.</p><div id="usbradiotab"></div></details>
   </div>
 </section>
 
@@ -227,40 +308,20 @@ details.card[open] summary{margin-bottom:12px}
     <button class="btn ghost" id="loglast">Last ned</button>
   </div>
   <div class="logwrap" id="logwrap"><div id="logbox"></div></div>
-</section>
-
-<!-- VERKTØY -->
-<section id="verktoy" hidden>
-  <div class="grid g2">
-    <div class="card"><h2>Søk etter nye enheter</h2>
-      <p class="muted" style="margin-top:0">Går gjennom alt i Home Manager og finner lys, brytere og knapper appen ikke kjenner ennå. Tar 10–20 minutter og påvirker ikke radioen. Kjør det gjerne etter endringer i MRF eller xSetup.</p>
-      <div id="scanstat"></div>
-    </div>
-    <div class="card"><h2>Sikkerhetskopi</h2>
-      <p class="muted" style="margin-top:0">Lista over styre-objekter for alle lys og hele lista over objekter i Home Manager. Fint å ha før du endrer noe i xSetup.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="api/cache" download="xcomfort_object_cache.json">Styre-objekter</a><a class="btn" href="api/scan/all" download="hm_objekter.json">Alle objekter</a></div>
-    </div>
-  </div>
-  <div class="card" style="margin-top:14px" id="usbcard"><h2>USB-pinne (direkte radio)</h2>
-    <p class="muted" style="margin-top:0">Med xComfort-pinnen CKOZ-00/13 satt i HA-maskinen styres lysene rett over radio og reagerer med en gang. Uten pinne, eller hvis en dimmer ikke svarer, brukes Home Manager som før.</p>
-    <div id="usbstat" class="small"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
-      <label class="btn" style="cursor:pointer">Last opp USB-kart (.json)<input type="file" id="usbfil" accept=".json,application/json" hidden></label>
-      <button class="btn" id="usbvis">Vis kartet</button>
-    </div>
-    <div id="usbkart" style="margin-top:10px" hidden></div>
-  </div>
-  <div id="kand" style="margin-top:14px"></div>
-  <div class="card" style="margin-top:14px"><h2>Finn et objekt i Home Manager</h2>
-    <input id="objsok" type="search" placeholder="Navn eller nummer, f.eks. «stue» eller «BR» …" style="width:100%;max-width:420px">
-    <div id="objres" style="margin-top:10px"></div>
-  </div>
-  <details class="card" style="margin-top:14px" id="rawdet"><summary><svg class="i" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Rå trafikk fra Home Manager <span class="muted small" style="font-weight:400">for feilsøking</span></summary>
+  <details class="card mt" id="rawdet"><summary><svg class="i" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Rå trafikk fra Home Manager <span class="muted small" style="font-weight:400">for feilsøking</span></summary>
     <div class="toolbar"><input id="rawsok" type="search" placeholder="Filtrer, f.eks. et objektnummer …"><button class="btn" id="rawpause">Pause</button></div>
     <div class="raw" id="rawbox"></div>
   </details>
 </section>
 </main>
+
+<dialog id="editdlg">
+  <h3 id="edittitle">Endre</h3>
+  <label for="editnavn">Navn</label><input type="text" id="editnavn">
+  <label for="editsone">Rom</label><input type="text" id="editsone" list="romliste">
+  <div class="row"><button class="btn ghost danger" id="editrm" style="margin-right:auto">Fjern fra HA</button><button class="btn" id="editavbryt">Avbryt</button><button class="btn pri" id="editlagre">Lagre</button></div>
+</dialog>
+<datalist id="romliste"></datalist>
 <div id="toasts"></div>
 
 <script>
@@ -281,6 +342,8 @@ const I={
  wave:'<path d="M2 12h3l3-8 4 16 3-8h7v2h-6l-4 10-4-16-2 6H2z"/>',
  speed:'<path d="M12 4a10 10 0 0 0-8.7 15h17.4A10 10 0 0 0 12 4zm1 11.7a1.7 1.7 0 1 1-2.4-2.4L17 9z"/>',
  cmd:'<path d="M2 21 23 12 2 3v7l15 2-15 2z"/>',
+ pen:'<path d="M3 17.3V21h3.7l11-11-3.7-3.7zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.7 3.7z"/>',
+ radio:'<path d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-5.7-3.7L4.9 4.9a10 10 0 0 0 0 14.2l1.4-1.4a8 8 0 0 1 0-11.4zm11.4 0a8 8 0 0 1 0 11.4l1.4 1.4a10 10 0 0 0 0-14.2zM8.5 8.5 7.1 7.1a7 7 0 0 0 0 9.8l1.4-1.4a5 5 0 0 1 0-7zm7 0a5 5 0 0 1 0 7l1.4 1.4a7 7 0 0 0 0-9.8z"/>',
 };
 const ic=(n,c="i")=>`<svg class="${c}" viewBox="0 0 24 24">${I[n]}</svg>`;
 const KIND_IC={lys:"bulb",bryter:"power",markise:"blind",termostat:"thermo",knapp:"btn",alarm:"alert"};
@@ -288,11 +351,13 @@ function ago(sec){if(sec==null)return"";if(sec<5)return"akkurat nå";if(sec<60)r
 function dur(sec){const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);return d?`${d} d ${h} t`:h?`${h} t ${m} min`:`${m} min`}
 function toast(t,err){const e=document.createElement("div");e.className="toast"+(err?" err":"");e.textContent=t;$("#toasts").append(e);setTimeout(()=>e.remove(),3200)}
 async function cmd(type,id,value,label){try{const r=await post("api/cmd",{type,id,value});if(r.ok===false)throw new Error(r.feil);if(label)toast(label)}catch(e){toast("Kunne ikke sende: "+e.message,true)}}
+const stat=(v,l)=>`<div class="stat"><b>${v}</b><span>${l}</span></div>`;
 
 /* ---------- faner ---------- */
 let tab=(location.hash||"#hjem").slice(1);if(!$("#"+tab))tab="hjem";
 function show(t){tab=t;location.hash=t;$$("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));$$("main>section").forEach(s=>s.hidden=s.id!==t);tick(true)}
 $$("#tabs button").forEach(b=>b.onclick=()=>show(b.dataset.t));
+window.addEventListener("hashchange",()=>{const t=location.hash.slice(1);if(t!==tab&&$("#"+t))show(t)});
 
 /* ---------- status ---------- */
 let S=null,DEVS=[];
@@ -300,29 +365,44 @@ async function loadStatus(){
   S=await api("api/status");
   $("#ver").textContent="v"+S.versjon+" · oppe i "+dur(S.oppetid_sek);
   const prob=S.problemer||[];let cls,txt,h1,p,icn;
-  if(!S.mqtt){cls="err";txt="Ikke koblet til HA";h1="Ikke koblet til Home Assistant";p="Appen får ikke kontakt med MQTT-megleren ("+esc(S.mqtt_host)+"). Sjekk at Mosquitto kjører.";icn="off"}
+  if(!S.mqtt){cls="err";txt="Ikke koblet til HA";h1="Ikke koblet til Home Assistant";p="Appen får ikke kontakt med MQTT-megleren ("+esc(S.mqtt_host)+"). Sjekk at Mosquitto kjører, og at brukernavn og passord i appens Konfigurasjon stemmer.";icn="off"}
   else if(prob.length){cls="warn";txt=prob.length+" problem";h1="Noe trenger oppmerksomhet";p=prob.map(esc).join(" · ");icn="alert"}
-  else if(!S.lytter_ok){cls="warn";txt="Treg status";h1="Kontakt med Home Manager, men uten direktelinje";p="Status hentes hvert "+esc(S.poll_modus)+". Den direkte forbindelsen prøver å koble til igjen av seg selv.";icn="alert"}
+  else if(!S.lytter_ok){cls="warn";txt="Treg status";h1="Kontakt med Home Manager, men uten direktelinje";p="Status hentes "+(S.poll_modus==="vanlig"?"jevnlig":esc(S.poll_modus))+". Den direkte forbindelsen prøver å koble til igjen av seg selv.";icn="alert"}
   else{cls="ok";txt="Alt fungerer";h1="Alt fungerer";p="Direkte forbindelse til Home Manager. Endringer i huset vises med en gang. Siste melding "+ago(S.siste_melding_sek)+".";icn="ok"}
   $("#pill").className="pill "+cls;$("#pilltx").textContent=txt;
   $("#hero").className="card hero "+cls;$("#heroi").innerHTML=ic(icn);$("#herot").textContent=h1;$("#herop").innerHTML=p;
 }
 function kpi(icn,lbl,val,hint){return `<div class="card kpi"><div class="lbl">${ic(icn)}${lbl}</div><div class="val">${val}</div><div class="hint">${hint||""}</div></div>`}
+function renderWelcome(){
+  const a=S.antall,total=a.lys+a.brytere+a.knapper+a.markiser+a.termostater;
+  if(total>0){$("#welcome").innerHTML="";return}
+  const scanned=scanInfo&&scanInfo.status&&scanInfo.status.objects>0;
+  $("#welcome").innerHTML=`<div class="card welcome" style="margin-bottom:14px"><h2>Velkommen! La oss finne lysene dine</h2>
+   <p class="muted">Appen er koblet til, men vet ennå ikke hva som finnes i anlegget ditt. Det fikser du på et par minutter:</p>
+   <div class="steps">
+    <div class="step ${S.lytter_ok||S.siste_melding_sek!=null?"done":""}"><div class="n">1</div><div><b>Koble til</b><div class="small muted">Home Manager og MQTT. ${S.mqtt?"Ferdig.":"Venter på MQTT …"}</div></div></div>
+    <div class="step ${scanned?"done":""}"><div class="n">2</div><div><b>Søk</b><div class="small muted">Finn alt som finnes i Home Manager (10–20 min).</div></div></div>
+    <div class="step"><div class="n">3</div><div><b>Velg</b><div class="small muted">Gi lys, brytere og knapper navn og rom.</div></div></div>
+   </div>
+   <button class="btn pri mt" onclick="show('enheter')">Gå til Enheter</button></div>`;
+}
 function renderHome(){
   if(!S)return;
+  renderWelcome();
   const lys=DEVS.filter(d=>d.type==="lys"),on=lys.filter(d=>d.på).length;
   const resp=S.snitt_respons!=null?S.snitt_respons.toFixed(1)+" <small>s</small>":"–";
   $("#kpis").innerHTML=
-    kpi("bulb","Lys på",`${on} <small>av ${lys.length||S.antall.lys}</small>`,on?"trykk Rom for å se hvilke":"alt er av")+
+    kpi("bulb","Lys på",`${on} <small>av ${lys.length||S.antall.lys}</small>`,on?"se hvilke under Rom":"alt er av")+
     kpi("speed","Responstid",resp,S.bekreftet?`snitt av ${S.bekreftet} målinger`:"skru et lys av/på fra HA")+
     kpi("cmd","Kommandoer",S.sendt,S.feilet?`<span style="color:var(--err)">${S.feilet} feilet</span>`:"ingen feil")+
-    kpi("wave","Radiotrafikk",S.radio_5min,"kvitteringer siste 5 min");
+    kpi("radio","USB-pinne",S.usb.tilkoblet?"Tilkoblet":S.usb.aktivert?"Ikke funnet":"Av",S.usb.tilkoblet?`${S.usb.lys_med_kart} lys styres direkte`:"lys går via Home Manager");
+  $("#blindcard").hidden=!S.markiser.length;
   $("#blinds").innerHTML=S.markiser.map(m=>{
     const mv=m.tilstand==="opening"?"kjører ut":m.tilstand==="closing"?"kjører inn":"";
     return `<div class="blind"><div class="hd">${ic("blind")}<b>${esc(m.navn)}</b>${mv?`<span class="moving">${mv}</span>`:""}<span class="muted">${m.posisjon} % ute</span></div>
     <div class="track"><div style="width:${m.posisjon}%"></div></div>
-    <div class="ctl"><button class="btn" data-mk="${m.id}:inn">Inn</button><button class="btn" data-mk="${m.id}:stopp">Stopp</button><button class="btn" data-mk="${m.id}:ut">Ut</button></div></div>`}).join("")||'<div class="empty">Ingen markiser.</div>';
-  $$("[data-mk]").forEach(b=>b.onclick=()=>{const[id,a]=b.dataset.mk.split(":");cmd("markise",+id,a,"Sendt: "+a)});
+    <div class="ctl"><button class="btn" data-mk="${m.id}:inn">Inn</button><button class="btn" data-mk="${m.id}:stopp">Stopp</button><button class="btn" data-mk="${m.id}:ut">Ut</button></div></div>`}).join("");
+  $$("#blinds [data-mk]").forEach(b=>b.onclick=()=>{const[id,a]=b.dataset.mk.split(":");cmd("markise",+id,a,"Sendt: "+a)});
   const r=(S.responstider||[]).slice(-24);
   if(!r.length){$("#chart").innerHTML='<div class="empty">Ingen målinger ennå. Skru et lys av eller på fra Home Assistant.</div>';}
   else{const mx=Math.max(3,...r.map(x=>x.sek));
@@ -340,44 +420,60 @@ async function loadEvents(){
 }
 function renderFeed(){
   if(!evList.length)return;
-  $("#feed").innerHTML=evList.map(e=>{const tm=new Date(e.ts*1000).toLocaleTimeString("no-NO",{hour:"2-digit",minute:"2-digit",second:"2-digit"}),tx=e.t;
-    return `<div class="ev ${esc(e.l)} ${e.fresh?"new":""}"><div class="ic">${ic(KIND_IC[e.l]||"info")}</div><div class="tx">${esc(tx)}</div><div class="tm">${esc(tm)}</div></div>`}).join("");
+  $("#feed").innerHTML=evList.map(e=>{const tm=new Date(e.ts*1000).toLocaleTimeString("no-NO",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    return `<div class="ev ${esc(e.l)} ${e.fresh?"new":""}"><div class="ic">${ic(KIND_IC[e.l]||"info")}</div><div class="tx">${esc(e.t)}</div><div class="tm">${esc(tm)}</div></div>`}).join("");
   evList.forEach(e=>e.fresh=false);
 }
 
 /* ---------- rom ---------- */
 let romFilter="",typeFilter="";
-async function loadDevices(){DEVS=await api("api/devices");if(tab==="rom")renderRooms();if(tab==="knapper")renderButtons();if(tab==="hjem")renderHome()}
+const zonesOf=()=>[...new Set(DEVS.map(d=>d.sone))].sort((a,b)=>a.localeCompare(b,"no"));
+async function loadDevices(){DEVS=await api("api/devices");$("#romliste").innerHTML=zonesOf().map(z=>`<option value="${esc(z)}">`).join("");
+  if(tab==="rom")renderRooms();if(tab==="knapper")renderButtons();if(tab==="hjem")renderHome()}
 $("#romsok").oninput=renderRooms;$("#baretpa").onchange=renderRooms;
 $$("#typer button").forEach(b=>b.onclick=()=>{typeFilter=b.dataset.v;$$("#typer button").forEach(x=>x.classList.toggle("on",x===b));renderRooms()});
 function tileHTML(d){
   const k=d.type;let body="",st=esc(d.tilstand);
   if(k==="lys"){const pct=d.på?parseInt(d.tilstand)||100:0;st=d.på?pct+" %":"av";
     body=`<input type="range" min="0" max="100" step="5" value="${pct}" data-dim="${d.id}" aria-label="Lysstyrke ${esc(d.navn)}">`}
-  if(k==="markise"){const mv=d.bevegelse==="opening"?" · kjører ut":d.bevegelse==="closing"?" · kjører inn":"";st=(d.posisjon||0)+" % ute"+mv}
-  if(k==="markise")body=`<div class="track"><div style="width:${d.posisjon||0}%"></div></div><div class="row3"><button class="btn" data-mk="${d.id}:inn">Inn</button><button class="btn" data-mk="${d.id}:stopp">Stopp</button><button class="btn" data-mk="${d.id}:ut">Ut</button></div>`;
+  if(k==="markise"){const mv=d.bevegelse==="opening"?" · kjører ut":d.bevegelse==="closing"?" · kjører inn":"";st=(d.posisjon||0)+" % ute"+mv;
+    body=`<div class="track"><div style="width:${d.posisjon||0}%"></div></div><div class="row3"><button class="btn" data-mk="${d.id}:inn">Inn</button><button class="btn" data-mk="${d.id}:stopp">Stopp</button><button class="btn" data-mk="${d.id}:ut">Ut</button></div>`}
   if(k==="termostat")st=d.temp?`<b style="color:var(--fg);font-size:15px">${esc(d.temp)} °C</b> · mål ${esc(d.mal)} °C`:"venter på avlesning";
   const click=k==="lys"||k==="bryter";
-  return `<div class="tile ${d.på?"on":""} ${click?"":"static"}"><button class="top" ${click?`data-tg="${k}:${d.id}:${d.på?1:0}"`:""} title="${click?"Trykk for av/på":""}"><div class="ic">${ic(KIND_IC[k]||"info")}</div><div><div class="nm">${esc(d.navn)}</div><div class="st">${st}</div></div></button>${body}</div>`;
+  const edit=d.ekstra?`<button class="btn icon edit" data-edit="${d.id}" title="Endre navn eller rom">${ic("pen")}</button>`:"";
+  return `<div class="tile ${d.på?"on":""} ${click?"":"static"}">${edit}<button class="top" ${click?`data-tg="${k}:${d.id}:${d.på?1:0}"`:""} title="${click?"Trykk for av/på":""}"><div class="ic">${ic(KIND_IC[k]||"info")}</div><div><div class="nm">${esc(d.navn)}</div><div class="st">${st}</div></div></button>${body}</div>`;
 }
 function renderRooms(){
   const q=($("#romsok").value||"").toLowerCase(),onlyOn=$("#baretpa").checked;
-  const devs=DEVS.filter(d=>d.type!=="knapp"&&(!typeFilter||d.type===typeFilter)&&(!onlyOn||d.på)&&(!q||(d.navn+" "+d.sone).toLowerCase().includes(q)));
+  const all=DEVS.filter(d=>d.type!=="knapp");
+  if(!all.length){$("#romchips").innerHTML="";$("#rooms").innerHTML=`<div class="card empty">Ingen enheter ennå. <a href="#enheter" onclick="show('enheter');return false">Legg til enheter</a> først.</div>`;return}
+  const devs=all.filter(d=>(!typeFilter||d.type===typeFilter)&&(!onlyOn||d.på)&&(!q||(d.navn+" "+d.sone).toLowerCase().includes(q)));
   const zones={};devs.forEach(d=>(zones[d.sone]=zones[d.sone]||[]).push(d));
   const names=Object.keys(zones).sort((a,b)=>a.localeCompare(b,"no"));
-  const allZones=[...new Set(DEVS.filter(d=>d.type!=="knapp").map(d=>d.sone))].sort((a,b)=>a.localeCompare(b,"no"));
+  const allZones=[...new Set(all.map(d=>d.sone))].sort((a,b)=>a.localeCompare(b,"no"));
   $("#romchips").innerHTML=`<button class="chip ${romFilter?"":"on"}" data-z="">Alle rom</button>`+allZones.map(z=>`<button class="chip ${romFilter===z?"on":""}" data-z="${esc(z)}">${esc(z)}</button>`).join("");
   $$("#romchips .chip").forEach(c=>c.onclick=()=>{romFilter=c.dataset.z;renderRooms()});
   const shown=names.filter(z=>!romFilter||z===romFilter);
   $("#rooms").innerHTML=shown.map(z=>{const ds=zones[z],onLys=ds.filter(d=>(d.type==="lys"||d.type==="bryter")&&d.på);
     return `<div class="room"><div class="room-hd"><h3>${esc(z)}</h3><span class="cnt">${onLys.length?onLys.length+" på":"alt av"}</span>${onLys.length?`<button class="btn ghost" data-alloff="${esc(z)}">Slå av alt</button>`:""}</div><div class="tiles">${ds.map(tileHTML).join("")}</div></div>`}).join("")||'<div class="card empty">Ingen treff.</div>';
-  $$("[data-tg]").forEach(b=>b.onclick=()=>{const[k,id,on]=b.dataset.tg.split(":");const tile=b.closest(".tile");tile.classList.toggle("on",on!=="1");
+  $$("[data-tg]").forEach(b=>b.onclick=()=>{const[k,id,on]=b.dataset.tg.split(":");b.closest(".tile").classList.toggle("on",on!=="1");
     if(k==="lys")cmd("lys",+id,on==="1"?0:100);else cmd("bryter",+id,on==="1"?"OFF":"ON");setTimeout(loadDevices,1500)});
   $$("[data-dim]").forEach(r=>{r.oninput=()=>{r.closest(".tile").querySelector(".st").textContent=r.value>0?r.value+" %":"av"};
     r.onchange=()=>{cmd("lys",+r.dataset.dim,+r.value);setTimeout(loadDevices,1500)}});
   $$("#rooms [data-mk]").forEach(b=>b.onclick=()=>{const[id,a]=b.dataset.mk.split(":");cmd("markise",+id,a,"Sendt: "+a)});
+  $$("#rooms [data-edit]").forEach(b=>b.onclick=()=>openEdit(+b.dataset.edit));
   $$("[data-alloff]").forEach(b=>b.onclick=()=>{const z=b.dataset.alloff;DEVS.filter(d=>d.sone===z&&d.på).forEach(d=>{if(d.type==="lys")cmd("lys",d.id,0);if(d.type==="bryter")cmd("bryter",d.id,"OFF")});toast("Slår av alt i "+z);setTimeout(loadDevices,2000)});
 }
+
+/* ---------- endre / fjerne ---------- */
+let editId=null;
+function openEdit(id){const d=DEVS.find(x=>x.id===id);if(!d)return;editId=id;
+  $("#edittitle").textContent="Endre "+d.navn;$("#editnavn").value=d.navn;$("#editsone").value=d.sone;$("#editdlg").showModal()}
+$("#editavbryt").onclick=()=>$("#editdlg").close();
+$("#editlagre").onclick=async()=>{const r=await post("api/extra/update",{id:editId,navn:$("#editnavn").value,sone:$("#editsone").value});
+  $("#editdlg").close();r.ok?toast("Lagret. Home Assistant oppdateres om et øyeblikk."):toast(r.feil||"Feil",true);loadDevices()};
+$("#editrm").onclick=async()=>{const d=DEVS.find(x=>x.id===editId);if(!confirm(`Fjerne «${d?d.navn:editId}» fra Home Assistant? Automasjoner som bruker den slutter å virke.`))return;
+  const r=await post("api/extra/remove",{id:editId});$("#editdlg").close();r.ok?toast("Fjernet"):toast(r.feil||"Feil",true);loadDevices()};
 
 /* ---------- knapper ---------- */
 let scanInfo=null;
@@ -385,9 +481,8 @@ function renderButtons(){
   const bs=DEVS.filter(d=>d.type==="knapp").sort((a,b)=>(a.sek_siden??1e9)-(b.sek_siden??1e9));
   $("#btnlist").innerHTML=bs.map(b=>`<div class="btnrow ${b.sek_siden!=null&&b.sek_siden<4?"pressed":""}"><div class="ic">${ic("btn")}</div>
     <div class="tx"><b>${esc(b.navn)}</b> <span class="muted">· ${esc(b.sone)}</span><div class="small muted">${b.siste?`Siste: <span class="tag">${esc(b.siste)}</span> ${ago(b.sek_siden)}`:"Ingen trykk siden appen startet"}</div></div>
-    ${b.ekstra?`<button class="btn ghost danger" data-rm="${b.id}" data-nm="${esc(b.navn)}">Fjern</button>`:""}</div>`).join("")||'<div class="empty">Ingen knapper ennå.</div>';
-  $$("[data-rm]").forEach(e=>e.onclick=async()=>{if(!confirm(`Fjerne «${e.dataset.nm}» fra Home Assistant? Automasjoner som bruker den slutter å virke.`))return;
-    const r=await post("api/extra/remove",{id:+e.dataset.rm});r.ok?toast("Fjernet"):toast(r.feil||"Feil",true);loadDevices()});
+    ${b.ekstra?`<button class="btn icon" data-edit="${b.id}" title="Endre navn eller rom">${ic("pen")}</button>`:""}</div>`).join("")||'<div class="empty">Ingen knapper ennå. Trykk på en bryter i huset, så dukker den opp øverst her og kan legges til.</div>';
+  $$("#btnlist [data-edit]").forEach(e=>e.onclick=()=>openEdit(+e.dataset.edit));
 }
 async function loadNewButtons(){
   scanInfo=await api("api/scan");const ny=scanInfo.nylig||[];
@@ -396,6 +491,72 @@ async function loadNewButtons(){
   $("#nyknapper").innerHTML=ny.length?`<div class="card" style="margin-bottom:14px;border-color:var(--acc)"><h2>${ic("info")}Nye knapper funnet <span class="sub">trykket på, men ikke lagt til ennå</span></h2>${ny.map(x=>`<div class="item"><div class="tx"><b>${esc(x.navn)}</b><div class="small muted">${esc(x.objekt)} · nr. ${x.id} · ${ago(x.sek_siden)}</div></div><button class="btn pri" data-add="${x.id}">Legg til i HA</button></div>`).join("")}</div>`:"";
   $$("#nyknapper [data-add]").forEach(b=>b.onclick=async()=>{b.disabled=true;await post("api/extra",{knapper:[+b.dataset.add]});toast("Lagt til. Den dukker opp i HA om et øyeblikk.");loadNewButtons();loadDevices()});
 }
+
+/* ---------- enheter ---------- */
+const KINDS=[["lys","Dimbare lys","bulb"],["brytere","Av/på-brytere","power"],["knapper","Knapper og innganger","btn"]];
+async function loadEnheter(){
+  const s=scanInfo=await api("api/scan"),st=s.status,c=s.kandidater;
+  $("#scanstat").innerHTML=st.running?`<div class="progress"><div style="width:${Math.round(st.progress*100)}%"></div></div><div class="small muted">${Math.round(st.progress*100)} % · ${st.found} objekter funnet så langt</div>`
+    :`<div class="row"><button class="btn pri" id="scan">${ic("wave")}${st.finished?"Søk på nytt":"Start søk"}</button><span class="small muted">${st.finished?`Sist kjørt ${esc(st.finished)} · ${st.objects} objekter`:"Ikke kjørt ennå"}${st.error?` · <span style="color:var(--err)">Feil: ${esc(st.error)}</span>`:""}</span></div>`;
+  const sb=$("#scan");if(sb)sb.onclick=async()=>{sb.disabled=true;await post("api/scan/start");toast("Søket er startet");loadEnheter()};
+  const keep={};$$("#kand [data-k]").forEach(r=>keep[r.dataset.k]={navn:r.querySelector(".nv").value,sone:r.querySelector(".sv").value,på:r.querySelector("input[type=checkbox]").checked});
+  const open=KINDS.map(([k])=>({k,arr:(c[k]||[]).filter(x=>!x.lagt_til)}));
+  const n=open.reduce((a,x)=>a+x.arr.length,0);
+  if(!n){$("#kand").innerHTML=`<div class="empty">${st.objects?"Alt som ble funnet er lagt til. Fint!":"Kjør søket først, så dukker enhetene opp her."}</div>`;return}
+  if($("#kand").dataset.sig===JSON.stringify(open.map(x=>x.arr.map(y=>y.id))))return;   // ikke tegn på nytt mens man skriver
+  $("#kand").dataset.sig=JSON.stringify(open.map(x=>x.arr.map(y=>y.id)));
+  $("#kand").innerHTML=open.filter(x=>x.arr.length).map(({k,arr})=>{const[,title,icn]=KINDS.find(x=>x[0]===k);
+    return `<div class="mt"><div class="cand-hd">${ic(icn)}<h3>${title} <span class="muted small">(${arr.length})</span></h3><label class="small muted row" style="gap:6px"><input type="checkbox" data-all="${k}" checked> velg alle</label></div>
+    ${arr.map(x=>{const id=k+":"+x.id,kp=keep[id]||{},m=/^IN_([^_]+)_(.+)$/.exec(x.objekt||"");
+      if(m&&kp.navn==null){kp.navn=x.navn.startsWith(m[1]+" ")?x.navn.slice(m[1].length+1):x.navn;kp.sone=m[1]}return `<div class="item" data-k="${id}"><input type="checkbox" ${kp.på===false?"":"checked"} data-kind="${k}"><div class="tx"><span class="small muted">${esc(x.objekt)} · nr. ${x.id}</span></div>
+      <input type="text" class="sm nv" value="${esc(kp.navn??x.navn)}" placeholder="Navn"><input type="text" class="sm sv" list="romliste" value="${esc(kp.sone??"")}" placeholder="Rom"></div>`}).join("")}</div>`}).join("")
+    +`<div class="row mt"><button class="btn pri" id="addsel">Legg til valgte i Home Assistant</button><span class="small muted">Uten rom havner de under «Nye enheter».</span></div>`;
+  $$("#kand [data-all]").forEach(cb=>cb.onchange=()=>$$(`#kand [data-kind=${cb.dataset.all}]`).forEach(x=>x.checked=cb.checked));
+  $("#addsel").onclick=async()=>{const body={lys:[],brytere:[],knapper:[]};
+    $$("#kand [data-k]").forEach(r=>{if(!r.querySelector("input[type=checkbox]").checked)return;const[k,id]=r.dataset.k.split(":");
+      body[k].push({id:+id,navn:r.querySelector(".nv").value,sone:r.querySelector(".sv").value})});
+    if(!body.lys.length&&!body.brytere.length&&!body.knapper.length)return toast("Ingenting er valgt",true);
+    $("#addsel").disabled=true;const r=await post("api/extra",body);toast(`La til ${r.lagt_til.length} enheter. De dukker opp i Home Assistant om et øyeblikk.`);
+    $("#kand").dataset.sig="";loadEnheter();loadDevices()};
+  if(st.objects!==allCount)loadAll(st.objects);
+}
+let allObj=[],allCount=-1;
+async function loadAll(count){allCount=count;allObj=await api("api/scan/all");renderObj()}
+$("#objsok").oninput=renderObj;
+function renderObj(){
+  const q=($("#objsok").value||"").toLowerCase().trim();
+  if(!allObj.length){$("#objres").innerHTML='<div class="small muted">Kjør søket først, så kan du søke i alt Home Manager har.</div>';return}
+  if(!q){$("#objres").innerHTML=`<div class="small muted">${allObj.length} objekter i siste søk. Skriv for å søke.</div>`;return}
+  const hits=allObj.filter(o=>o.navn.toLowerCase().includes(q)||String(o.id).includes(q)).slice(0,150);
+  $("#objres").innerHTML=hits.map(o=>`<div class="item"><div class="tx"><b>${esc(o.navn)}</b><div class="small muted">nr. ${o.id} · type ${o.type}${o.kjent?" · brukes allerede":""}</div></div>${o.kjent?"":`<button class="btn" data-addo="${o.id}">Legg til som knapp</button>`}</div>`).join("")||'<div class="small muted">Ingen treff.</div>';
+  $$("[data-addo]").forEach(b=>b.onclick=async()=>{b.disabled=true;await post("api/extra",{knapper:[+b.dataset.addo]});toast("Lagt til");allCount=-1;loadEnheter()});
+}
+
+/* ---------- usb ---------- */
+async function loadUsb(){
+  const u=await api("api/usb"),L=u.laering||{};
+  const modus={hybrid:"hybrid (pinnen først, Home Manager som reserve)",pinne:"bare USB-pinne",home_manager:"bare Home Manager"}[u.modus]||u.modus;
+  const pill=!u.aktivert?`<span class="pill inl">Av: «Lysstyring» står på bare Home Manager</span>`
+    :u.tilkoblet?`<span class="pill ok inl"><span class="d"></span>Tilkoblet${u.navn?" · "+esc(u.navn):""}</span>`
+    :`<span class="pill warn inl"><span class="d"></span>Ingen pinne funnet. Lys går via Home Manager.</span>`;
+  $("#usbstat").innerHTML=`<div class="row">${pill}<span class="small muted">Lysstyring: <b>${esc(modus)}</b> (endres i appens Konfigurasjon)</span></div>
+   <div class="stats">${stat(`${u.lys_med_kart}<small class="muted" style="font-size:13px"> / ${u.lys_totalt}</small>`,"lys har dimmere i kartet")}${stat(u.sendt,"radiomeldinger sendt")}${stat(u.bekreftet,"bekreftet av dimmeren")}${stat(u.bekreftet_hm||0,"bekreftet via Home Manager")}${u.modus==="pinne"?stat(u.ubekreftet,"ikke bekreftet"):stat(u.via_reserve,"tatt over av Home Manager")}${stat(u.store_bolker||0,"store bolker via Home Manager")}</div>
+   ${u.siste_feil?`<div class="small mt" style="color:var(--err)">Siste feil: ${esc(u.siste_feil)}</div>`:""}`;
+  const missing=u.lys_totalt-u.lys_med_kart;
+  $("#usblearn").innerHTML=L.kjorer?`<div class="progress"><div style="width:${L.totalt?Math.round(L.ferdig/L.totalt*100):0}%"></div></div><div class="small muted">${L.ferdig} av ${L.totalt} · ${esc(L.melding)}</div>`
+   :`<div class="row"><button class="btn pri" id="learnmiss" ${!u.tilkoblet||!missing?"disabled":""}>${ic("radio")}Finn dimmere for ${missing} lys som mangler</button><button class="btn" id="learnall" ${!u.tilkoblet||!u.lys_totalt?"disabled":""}>Lær alle på nytt</button>${!u.tilkoblet?`<span class="small muted">Krever at pinnen er tilkoblet.</span>`:""}</div>
+     ${L.melding?`<div class="small mt">${esc(L.melding)}${(L.uten_svar||[]).length?`<div class="muted">Fikk ikke svar fra: ${L.uten_svar.map(esc).join(", ")}. De er trolig utenfor rekkevidde for pinnen, eller er av/på-lys uten dimmer.</div>`:""}</div>`:""}`;
+  const lm=$("#learnmiss"),la=$("#learnall");
+  if(lm)lm.onclick=async()=>{const r=await post("api/usb/laer",{lys:"mangler"});r.ok?toast(`Lytter på ${r.antall} lys …`):toast(r.feil,true);loadUsb()};
+  if(la)la.onclick=async()=>{if(!confirm("Lære alle lys på nytt? Det tar omtrent 10 sekunder per lys."))return;const r=await post("api/usb/laer",{lys:"alle"});r.ok?toast(`Lytter på ${r.antall} lys …`):toast(r.feil,true);loadUsb()};
+  $("#usbkart").innerHTML=u.kart.length?`<table class="t"><tr><th>Lys</th><th>Dimmere (serienummer)</th></tr>${u.kart.map(k=>`<tr><td>${esc(k.navn)}</td><td class="mono">${k.serienr.join(", ")}</td></tr>`).join("")}</table>`:`<div class="small muted">Ingen lys i kartet ennå.</div>`;
+  $("#usbframes summary").textContent=`Hva pinnen hører (${u.mottatt||0} rammer, ${u.radio_mottatt||0} radiomeldinger, ${u.kvitteringer||0} kvitteringer)`;
+  $("#usbraw").textContent=(u.siste_rammer||[]).map(r=>r[0]+"  "+r[1]).join("\n")||"Ingenting mottatt ennå.";
+  const rd=u.radio_dimmere||[];
+  $("#usbradio summary").textContent=`Radiomeldinger til og fra dimmerne (${rd.length})`;
+  $("#usbradiotab").innerHTML=rd.length?`<table class="t"><tr><th>Tid</th><th>Lys</th><th>Retning</th><th>Siste kommando</th><th>Ramme</th></tr>${rd.slice().reverse().map(r=>`<tr><td>${esc(r.tid)}</td><td>${esc(r.lys)}</td><td>${esc(r.retning)}</td><td>${esc(r.siste_kommando)}</td><td class="mono small">${esc(r.ramme)}</td></tr>`).join("")}</table>`:`<div class="small muted">Ingenting ennå.</div>`;
+}
+$("#usbfil").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const r=await post("api/usb/kart",JSON.parse(await f.text()));toast(`Kart lagret: ${r.lys_med_kart} lys`);loadUsb()}catch(err){toast("Kunne ikke lese fila: "+err.message,true)}e.target.value=""};
 
 /* ---------- logg ---------- */
 let logCursor=0,logPaused=false,logLevel="",LOG=[];
@@ -413,53 +574,12 @@ function renderLog(full,added){
   else{const box=$("#logbox");if(box.querySelector(".empty"))box.innerHTML="";box.insertAdjacentHTML("beforeend",added.filter(logMatch).map(logHTML).join(""));while(box.children.length>2000)box.firstChild.remove()}
   if(atBottom||full)w.scrollTop=w.scrollHeight;
 }
-
-/* ---------- verktøy ---------- */
 let rawCursor=0,rawPaused=false;
 $("#rawpause").onclick=()=>{rawPaused=!rawPaused;$("#rawpause").textContent=rawPaused?"Fortsett":"Pause"};
 async function loadRaw(){if(rawPaused||!$("#rawdet").open)return;const n=await api("api/raw?after="+rawCursor);if(!n.length)return;rawCursor=n[n.length-1].n;
   const q=($("#rawsok").value||"").toLowerCase(),box=$("#rawbox"),atB=box.scrollTop+box.clientHeight>=box.scrollHeight-30;
   box.insertAdjacentHTML("beforeend",n.filter(l=>!q||l.t.toLowerCase().includes(q)).map(l=>esc(l.t)+"\n").join(""));
   if(box.textContent.length>300000)box.textContent=box.textContent.slice(-200000);if(atB)box.scrollTop=box.scrollHeight}
-async function loadUsb(){
-  const u=await api("api/usb");
-  const wasOpen=[...document.querySelectorAll("#usbstat details")].map(d=>d.open);
-  const modus={hybrid:"Hybrid: USB-pinnen først, Home Manager som reserve",pinne:"Bare USB-pinne (ingen reserve)",home_manager:"Bare Home Manager"}[u.modus]||u.modus;
-  const st=!u.aktivert?`<span class="pill" style="margin:0">Bare Home Manager er valgt i innstillingene</span>`
-    :u.tilkoblet?`<span class="pill ok" style="margin:0"><span class="d"></span>Pinnen er tilkoblet${u.navn?" ("+esc(u.navn)+")":""}</span>`
-    :`<span class="pill warn" style="margin:0"><span class="d"></span>Ingen pinne funnet, bruker Home Manager</span>`;
-  $("#usbstat").innerHTML=`${st}<div style="margin-top:8px"><b>Lysstyring:</b> ${esc(modus)} <span class="muted">(endres under appens Konfigurasjon)</span></div><div style="margin-top:4px">${u.lys_med_kart} av ${u.lys_totalt} lys har serienumre i kartet · ${u.sendt} radiomeldinger sendt · ${u.bekreftet} bekreftet av pinnen · ${u.omsendt||0} sendt på nytt via pinnen · ${u.bekreftet_hm||0} bekreftet via Home Manager · ${u.modus==="pinne"?`${u.ubekreftet} ikke bekreftet`:`${u.via_reserve} sendt på nytt via Home Manager · ${u.store_bolker||0} store bolker sendt rett via Home Manager`}${u.siste_feil?` · <span style="color:var(--err)">Siste feil: ${esc(u.siste_feil)}</span>`:""}</div>`;
-  $("#usbstat").innerHTML+=`<details style="margin-top:8px"><summary class="muted">Feilsøking: hva pinnen hører (${u.mottatt||0} rammer, ${u.radio_mottatt||0} radiomeldinger, ${u.kvitteringer||0} kvitteringer)</summary><pre class="small" style="white-space:pre-wrap;margin:6px 0 0">${(u.siste_rammer||[]).map(r=>esc(r[0]+"  "+r[1])).join("\n")||"Ingenting mottatt ennå."}</pre></details>`;
-  const rd=u.radio_dimmere||[];
-  $("#usbstat").innerHTML+=`<details style="margin-top:6px"><summary class="muted">Radiomeldinger til og fra dimmerne (${rd.length})</summary><div class="small muted" style="margin:6px 0">Viser hva Home Manager og dimmerne sender. Brukes for å sammenligne lysstyrke via pinnen og via Home Manager.</div><table class="small" style="width:100%"><tr><th style="text-align:left">Tid</th><th style="text-align:left">Lys</th><th style="text-align:left">Retning</th><th style="text-align:left">Siste kommando</th><th style="text-align:left">Ramme</th></tr>${rd.slice().reverse().map(r=>`<tr><td>${esc(r.tid)}</td><td>${esc(r.lys)}</td><td>${esc(r.retning)}</td><td>${esc(r.siste_kommando)}</td><td style="font-family:monospace;word-break:break-all">${esc(r.ramme)}</td></tr>`).join("")}</table></details>`;
-  [...document.querySelectorAll("#usbstat details")].forEach((d,i)=>{if(wasOpen[i])d.open=true});
-  $("#usbkart").innerHTML=u.kart.length?`<table class="small" style="width:100%"><tr><th style="text-align:left">Lys</th><th style="text-align:left">Serienumre (dimmere)</th></tr>${u.kart.map(k=>`<tr><td>${esc(k.navn)}</td><td>${k.serienr.join(", ")}</td></tr>`).join("")}</table>`:`<div class="muted">Ikke noe kart lastet opp ennå.</div>`;
-}
-$("#usbvis").onclick=()=>{const k=$("#usbkart");k.hidden=!k.hidden};
-$("#usbfil").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const r=await post("api/usb/kart",JSON.parse(await f.text()));toast(`Kart lagret: ${r.lys_med_kart} lys`);loadUsb()}catch(err){toast("Kunne ikke lese fila: "+err.message,true)}e.target.value=""};
-async function loadTools(){
-  loadUsb().catch(()=>{});
-  const s=scanInfo=await api("api/scan"),st=s.status,c=s.kandidater;
-  $("#scanstat").innerHTML=st.running?`<div class="progress"><div style="width:${Math.round(st.progress*100)}%"></div></div><div class="small muted">${Math.round(st.progress*100)} % · ${st.found} objekter funnet så langt. Du kan lukke siden imens.</div>`
-    :`<button class="btn pri" id="scan">${ic("wave")}Start søk</button> <span class="small muted" style="margin-left:6px">${st.finished?`Sist kjørt ${esc(st.finished)} · ${st.objects} objekter`:"Ikke kjørt ennå"}${st.error?` · <span style="color:var(--err)">Feil: ${esc(st.error)}</span>`:""}</span>`;
-  const sb=$("#scan");if(sb)sb.onclick=async()=>{sb.disabled=true;await post("api/scan/start");toast("Søket er startet");loadTools()};
-  const sec=(title,arr,kind)=>arr.length?`<div class="card"><h2>${title} <span class="sub">${arr.length} nye</span></h2>${arr.map(x=>`<div class="item"><div class="tx"><b>${esc(x.navn)}</b><div class="small muted">${esc(x.objekt)} · nr. ${x.id}</div></div>${x.lagt_til?'<span class="small" style="color:var(--ok);font-weight:600">Lagt til</span>':`<button class="btn" data-addk="${kind}:${x.id}">Legg til i HA</button>`}</div>`).join("")}</div>`:"";
-  const k=sec("Nye dimbare lys",c.lys,"lys")+sec("Nye av/på-brytere",c.brytere,"brytere")+sec("Nye knapper og innganger",c.knapper,"knapper");
-  $("#kand").innerHTML=k?`<div class="grid g2">${k}</div>`:"";
-  $$("[data-addk]").forEach(b=>b.onclick=async()=>{const[kind,id]=b.dataset.addk.split(":");b.disabled=true;await post("api/extra",{[kind]:[+id]});toast("Lagt til");loadTools()});
-  if(st.objects!==allCount)loadAll(st.objects);
-}
-let allObj=[],allCount=-1;
-async function loadAll(count){allCount=count;allObj=await api("api/scan/all");renderObj()}
-$("#objsok").oninput=renderObj;
-function renderObj(){
-  const q=($("#objsok").value||"").toLowerCase().trim();
-  if(!allObj.length){$("#objres").innerHTML='<div class="small muted">Kjør «Start søk» først, så kan du søke i alt Home Manager har.</div>';return}
-  if(!q){$("#objres").innerHTML=`<div class="small muted">${allObj.length} objekter i siste søk. Skriv for å søke.</div>`;return}
-  const hits=allObj.filter(o=>o.navn.toLowerCase().includes(q)||String(o.id).includes(q)).slice(0,150);
-  $("#objres").innerHTML=hits.map(o=>`<div class="item"><div class="tx"><b>${esc(o.navn)}</b><div class="small muted">nr. ${o.id} · type ${o.type}${o.kjent?" · brukes allerede":""}</div></div>${o.kjent?"":`<button class="btn" data-addo="${o.id}">Legg til som knapp</button>`}</div>`).join("")||'<div class="small muted">Ingen treff.</div>';
-  $$("[data-addo]").forEach(b=>b.onclick=async()=>{b.disabled=true;await post("api/extra",{knapper:[+b.dataset.addo]});toast("Lagt til");allCount=-1;loadTools()});
-}
 
 /* ---------- løkke ---------- */
 let n=0,busy=false;
@@ -468,11 +588,12 @@ async function tick(now){
   try{
     await loadStatus();
     await loadEvents();
-    if(tab==="hjem"){if(now||n%3===1)await loadDevices();renderHome();renderFeed()}
+    if(tab==="hjem"){if(now||n%3===1)await loadDevices();if(!scanInfo||n%15===0)scanInfo=await api("api/scan");renderHome();renderFeed()}
     if(tab==="rom"&&(now||n%2===0))await loadDevices();
     if(tab==="knapper"){await loadDevices();if(now||n%3===0)await loadNewButtons()}else if(n%10===0)await loadNewButtons();
-    if(tab==="logg")await loadLog();
-    if(tab==="verktoy"){if(now||n%3===0)await loadTools();await loadRaw()}
+    if(tab==="enheter"&&(now||n%3===0)){await loadEnheter();if(now)await loadDevices()}
+    if(tab==="usb")await loadUsb();
+    if(tab==="logg"){await loadLog();await loadRaw()}
   }catch(e){$("#pill").className="pill err";$("#pilltx").textContent="Mister kontakt med appen"}
   busy=false;
 }

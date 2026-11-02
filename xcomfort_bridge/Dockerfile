@@ -7,7 +7,7 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libusb-1.0-0 \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir paho-mqtt pyusb
+    && pip install --no-cache-dir "paho-mqtt>=2,<3" "pyusb==1.3.1"
 
 COPY *.py seed_cache.json /app/
 COPY web /app/web

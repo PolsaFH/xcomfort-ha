@@ -1,7 +1,7 @@
 name: "xComfort MQTT-bro"
-version: "2.7.1"
+version: "2.8.0"
 slug: "xcomfort_bridge"
-description: "Kobler xComfort-anlegget til Home Assistant via MQTT (lokalt, uten sky)"
+description: "Lokal styring av Eaton xComfort / Sensio via Home Manager, uten sky. Valgfri USB-pinne for lynrask lysstyring."
 arch:
   - aarch64
   - amd64

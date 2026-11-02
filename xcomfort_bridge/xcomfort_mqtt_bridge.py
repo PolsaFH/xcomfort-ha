@@ -47,7 +47,7 @@ import usbstick
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "2.7.1"
+BRIDGE_VERSION = "2.8.0"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -555,6 +555,8 @@ def publish_climate_discovery(client):
 
 def publish_button_discovery(client):
     # Selve resett-logikken ligger i et HA-script; dette er bare knappen.
+    if not xc.MARKISER:
+        return
     _pub_disc(client, "button", f"xcomfort_{BALKONG_RESET_BUTTON_ID}", {
         "name": "Resett markiser",
         "unique_id": f"xcomfort_button_{BALKONG_RESET_BUTTON_ID}",
@@ -767,11 +769,21 @@ SERIAL_TO_LIGHT = {}    # dimmer-serienr -> lys-smux
 RADIO_LOG = collections.deque(maxlen=40)   # radiomeldinger til/fra våre dimmere (feilsøking)
 
 
+# Radiokommandoer (på, av, sett nivå) som Home Manager sender til dimmere.
+RADIO_CMD_KINDS = (usbstick.CMD_ON, usbstick.CMD_OFF, usbstick.CMD_LEVEL)
+LEARN = {"kjorer": False, "lys": None, "hort": set(), "ferdig": 0, "totalt": 0,
+         "resultat": {}, "uten_svar": [], "melding": ""}
+_learning = set()        # lys som læres nå: skal gå via Home Manager, ikke pinnen
+LEARN_WINDOW_S = 3.5
+
+
 def _on_usb_radio(frame, info):
     """Alt pinnen hører. Tar vare på meldinger til og fra dimmerne i kartet,
     så man kan se hva Home Manager sender (f.eks. hvilken verdi den bruker
     for en gitt prosent) og hva dimmerne melder tilbake."""
-    _kind, src, dst = info
+    kind, src, dst = info
+    if LEARN["lys"] is not None and kind in RADIO_CMD_KINDS and usbstick.STICK_ADDR not in (src, dst):
+        LEARN["hort"].add(dst)
     if src == usbstick.STICK_ADDR:
         return
     if dst in SERIAL_TO_LIGHT:
@@ -862,7 +874,7 @@ def _try_usb(client, batch, t_start):
     rest, lights, targets = [], [], []
     for kind, smux_id, payload in batch:
         serials = USB_MAP.get(smux_id) if kind == "light" else None
-        if not serials or (mode == "hybrid" and _force_hm.get(smux_id, 0) > now):
+        if not serials or smux_id in _learning or (mode == "hybrid" and _force_hm.get(smux_id, 0) > now):
             rest.append((kind, smux_id, payload))
             continue
         brightness = _parse_light_brightness(payload)
@@ -934,6 +946,86 @@ def _check_usb_acks(lights, t0, fallback=True):
         LAST_USB.pop(smux_id, None)
         _queue_command("light", smux_id, json.dumps(
             {"state": "ON" if brightness else "OFF", "brightness": brightness}).encode())
+
+
+def _current_level(smux_id):
+    with _state_cache_lock:
+        raw = _state_cache.get(light_state_topic(smux_id))
+    try:
+        st = json.loads(raw or "{}")
+    except ValueError:
+        return None
+    if not st:
+        return None
+    return int(st.get("brightness", 100)) if st.get("state") == "ON" else 0
+
+
+def _listen_for(smux_id, level):
+    """Sender nivået via Home Manager og returnerer dimmerne pinnen hørte."""
+    LEARN["hort"] = set()
+    LEARN["lys"] = smux_id
+    _queue_command("light", smux_id, json.dumps(
+        {"state": "ON", "brightness": level} if level else {"state": "OFF"}).encode())
+    time.sleep(LEARN_WINDOW_S)
+    LEARN["lys"] = None
+    return set(LEARN["hort"])
+
+
+def _learn_one(smux_id):
+    level = _current_level(smux_id)
+    if level is None:
+        level = 0
+    heard = _listen_for(smux_id, level)
+    if not heard and level > 1:
+        # Home Manager sender kanskje ikke noe når nivået er det samme.
+        # Et lite dytt (1 %) som ikke synes, så tilbake.
+        heard = _listen_for(smux_id, level - 1)
+        _listen_for(smux_id, level)
+    if not heard:
+        return set()
+    # Kontroll: én runde til. Bare dimmere som hørtes begge gangene teller,
+    # så en tilfeldig melding i huset (noen trykket på en bryter) ikke blir med.
+    again = _listen_for(smux_id, level)
+    return heard & again if again else heard
+
+
+def learn_usb_map(light_ids):
+    """Lærer hvilke dimmere hvert lys styrer ved å lytte på radio mens
+    Home Manager sender. Kjøres i egen tråd fra nettsiden."""
+    LEARN.update(kjorer=True, ferdig=0, totalt=len(light_ids), resultat={}, uten_svar=[],
+                 melding="Lytter …")
+    names = REG["names"]
+    try:
+        for smux in light_ids:
+            if STICK is None or not STICK.healthy():
+                LEARN["melding"] = "USB-pinnen er ikke tilkoblet"
+                break
+            _learning.add(smux)
+            try:
+                LEARN["melding"] = f"Lytter på {names.get(smux, smux)}"
+                taken = {x for k, v in USB_MAP.items() if k != smux for x in v} | \
+                    {x for k, v in LEARN["resultat"].items() if k != smux for x in v}
+                found = sorted(_learn_one(smux) - taken)
+            finally:
+                _learning.discard(smux)
+            if found:
+                LEARN["resultat"][smux] = found
+            else:
+                LEARN["uten_svar"].append(names.get(smux, str(smux)))
+            LEARN["ferdig"] += 1
+        if LEARN["resultat"]:
+            merged = dict(USB_MAP)
+            merged.update(LEARN["resultat"])
+            save_usb_map(merged)
+        LEARN["melding"] = (f"Ferdig: {len(LEARN['resultat'])} lys lært"
+                            + (f", {len(LEARN['uten_svar'])} uten svar" if LEARN["uten_svar"] else ""))
+        log.info("USB-kart lært: %s", LEARN["melding"])
+    except Exception as e:  # noqa: BLE001
+        LEARN["melding"] = f"Stoppet: {e}"
+        log.exception("Læring av USB-kart feilet")
+    finally:
+        LEARN["lys"] = None
+        LEARN["kjorer"] = False
 
 
 def start_usb_stick():
@@ -1844,6 +1936,112 @@ def load_extras():
              len(extra.get("lys", [])), len(extra.get("brytere", [])), len(extra.get("knapper", [])))
 
 
+# ------------------------------------------------------------ anlegg --
+#
+# Listene over lys, brytere, markiser, sensorer og termostater i
+# xcomfort_local_control.py er laget for ETT bestemt anlegg (det appen ble
+# utviklet på). Hos alle andre ville de numrene peke på helt andre ting i
+# Home Manager. Derfor sjekker appen ved første oppstart om navnene i Home
+# Manager stemmer med listene. Gjør de det, brukes listene. Ellers starter
+# appen tom, og enhetene legges til fra nettsiden (Enheter → Søk).
+# Valget lagres i /data/anlegg.json og kan overstyres der.
+
+PROFILE_FILE = "/data/anlegg.json" if os.path.isdir("/data") else \
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "anlegg.json")
+PROFILE = {"innebygd": False, "grunn": "ikke sjekket"}
+
+
+def _load_seed():
+    try:
+        with open(SEED_CACHE_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _names_match_seed(seed, sample=12):
+    """Spør Home Manager om navnet på noen av objektene i den innebygde
+    lista. True/False, eller None hvis Home Manager ikke svarer. Navnene er
+    så spesielle (f.eks. D_TaklampefinstueStue på et bestemt nummer) at to
+    treff ikke kan skje tilfeldig, så noen omdøpte objekter gjør ingenting."""
+    items = [(int(k), v.get("name")) for k, v in sorted(seed.items()) if v.get("name")][:sample]
+    if not items:
+        return False
+    try:
+        conn = xc.XComfortConn()
+    except Exception as e:  # noqa: BLE001
+        log.info("Kunne ikke sjekke anlegget nå (%s)", e)
+        return None
+    try:
+        conn.sock.sendall(b"".join(xc.STX + f"d_obj {i}".encode("ascii") + xc.ETX for i, _ in items))
+        text = conn.drain(wait=1.0)
+    except Exception as e:  # noqa: BLE001
+        log.info("Kunne ikke sjekke anlegget nå (%s)", e)
+        return None
+    finally:
+        conn.close()
+    got = {int(o): n for o, n, _t in scanner.NAME_TYPE_RE.findall(text)}
+    hits = sum(1 for i, n in items if got.get(i) == n)
+    log.info("Sjekk av anlegget: %d av %d kjente navn stemte", hits, len(items))
+    return hits >= min(2, len(items))
+
+
+def decide_profile(check=_names_match_seed):
+    """Bestemmer om de innebygde enhetslistene skal brukes."""
+    try:
+        with open(PROFILE_FILE, encoding="utf-8") as f:
+            saved = json.load(f)
+        if isinstance(saved.get("innebygd"), bool):
+            PROFILE.update(innebygd=saved["innebygd"], grunn="lagret valg")
+            return PROFILE["innebygd"]
+    except FileNotFoundError:
+        pass
+    except Exception as e:  # noqa: BLE001
+        log.warning("Klarte ikke lese %s: %s", PROFILE_FILE, e)
+    had_data = os.path.exists(xc.CACHE_FILE)   # appen har kjørt her før (eldre versjon)
+    ok = check(_load_seed())
+    if ok is None:
+        # Home Manager svarer ikke akkurat nå. En installasjon som har kjørt
+        # før (fra før denne sjekken fantes) beholder listene; en ny starter
+        # tom. Ingenting lagres, så det sjekkes igjen ved neste oppstart.
+        PROFILE.update(innebygd=had_data, grunn="Home Manager svarte ikke, sjekkes ved neste oppstart")
+        return had_data
+    if not ok and had_data:
+        log.warning("Denne installasjonen har kjørt en eldre versjon, men navnene i Home Manager stemmer ikke med "
+                    "den innebygde enhetslisten. Appen starter derfor tom. Er dette feil, skriv "
+                    '{"innebygd": true} i %s og start appen på nytt.', PROFILE_FILE)
+    PROFILE.update(innebygd=bool(ok), grunn="navnene i Home Manager stemte" if ok else "nytt anlegg")
+    try:
+        with open(PROFILE_FILE, "w", encoding="utf-8") as f:
+            json.dump({"innebygd": bool(ok)}, f)
+    except OSError as e:
+        log.warning("Klarte ikke lagre %s: %s", PROFILE_FILE, e)
+    return bool(ok)
+
+
+def clear_builtin_devices():
+    """Fjerner de innebygde listene, så bare enheter lagt til fra nettsiden brukes."""
+    for lst in (xc.LIGHTS, xc.SWITCHES, xc.SENSORS, xc.MARKISER, xc.THERMOSTATS,
+                CONTINUOUS_SENSORS, BINARY_SENSORS, BUTTONS):
+        lst[:] = []
+    BINARY_NAMES.clear()
+    LIGHT_SWITCH_IDS.clear()
+    MARKISER_CTRL.markiser.clear()
+    STATS.markise.clear()
+    for k in OBJEKT_NAVN:
+        IDMAP.expected.pop(k, None)
+
+
+def apply_profile():
+    if decide_profile():
+        log.info("Kjente enheter for dette anlegget er lastet (%s)", PROFILE["grunn"])
+        merge_seed_cache()
+    else:
+        clear_builtin_devices()
+        log.info("Nytt anlegg (%s): appen bruker bare enheter du legger til under Enheter på nettsiden",
+                 PROFILE["grunn"])
+
+
 def merge_seed_cache():
     """Fyller inn styre-objekter som mangler i /data-cachen fra fila som
     foelger med appen, saa en ny installasjon ikke maa lete etter alt."""
@@ -2042,6 +2240,7 @@ class Api:
         snap = STATS.snapshot(MARKISER_CTRL.queue_length())
         return {
             "versjon": BRIDGE_VERSION,
+            "nytt_anlegg": not PROFILE["innebygd"],
             "oppetid_sek": round(time.time() - START_TIME),
             "problemer": self.health(),
             "antall": {"lys": len(xc.LIGHTS), "brytere": len(xc.SWITCHES), "markiser": len(xc.MARKISER),
@@ -2064,6 +2263,8 @@ class Api:
     def devices(self):
         with _state_cache_lock:
             cache = dict(_state_cache)
+        extra = self._read_extra()
+        extra_ids = {int(x["id"]) for k in ("lys", "brytere", "knapper") for x in extra.get(k, [])}
         out = []
         for zone, name, smux in xc.LIGHTS:
             st = json.loads(cache.get(light_state_topic(smux), "{}") or "{}")
@@ -2089,9 +2290,11 @@ class Api:
             z2, n2 = button_label(zone, name, oid)
             last = LAST_BUTTON.get(oid)
             out.append({"type": "knapp", "id": oid, "sone": z2, "navn": n2, "på": False,
-                        "ekstra": zone == "Knapper",
+                        "ekstra": oid in extra_ids,
                         "siste": last[0] if last else None, "sek_siden": round(time.time() - last[1]) if last else None,
                         "tilstand": last[0].replace("_", " ") if last else "ingen trykk ennå"})
+        for d in out:
+            d.setdefault("ekstra", d["id"] in extra_ids)
         return out
 
     def usb(self):
@@ -2102,9 +2305,26 @@ class Api:
                      "lys_med_kart": len(USB_MAP), "radio_dimmere": list(RADIO_LOG)[-25:],
                      "lys_totalt": len(xc.LIGHTS), "bekreftet": USB_STATS["bekreftet"],
                      "via_reserve": USB_STATS["reserve"], "store_bolker": USB_STATS["stor_bolk"],
+                     "laering": {k: v for k, v in LEARN.items() if k not in ("hort", "resultat", "lys")},
                      "kart": [{"id": k, "navn": REG["names"].get(k, str(k)), "serienr": v}
                               for k, v in sorted(USB_MAP.items(), key=lambda kv: REG["names"].get(kv[0], ""))]})
         return info
+
+    def usb_learn(self, body):
+        if LEARN["kjorer"]:
+            return {"ok": False, "feil": "læring pågår allerede"}
+        if STICK is None or not STICK.healthy():
+            return {"ok": False, "feil": "USB-pinnen er ikke tilkoblet (og Lysstyring må være hybrid eller pinne)"}
+        wanted = body.get("lys")
+        lights = [s for _, _, s in xc.LIGHTS]
+        if wanted == "mangler":
+            lights = [s for s in lights if s not in USB_MAP]
+        elif isinstance(wanted, list):
+            lights = [s for s in lights if s in {int(x) for x in wanted}]
+        if not lights:
+            return {"ok": False, "feil": "ingen lys å lære"}
+        threading.Thread(target=learn_usb_map, args=(lights,), daemon=True, name="usb-laering").start()
+        return {"ok": True, "antall": len(lights)}
 
     def usb_map_upload(self, body):
         lys = body.get("lys") if isinstance(body, dict) else None
@@ -2119,28 +2339,77 @@ class Api:
         log.info("Nytt USB-kart lagret: %d lys har serienumre", n)
         return {"ok": True, "lys_med_kart": n}
 
-    def remove_extra(self, body):
-        """Fjerner en knapp som er lagt til fra nettsiden (ikke de faste)."""
-        oid = int(body.get("id"))
+    def _read_extra(self):
         try:
             with open(EXTRA_FILE, encoding="utf-8") as f:
-                extra = json.load(f)
+                return json.load(f)
         except Exception:  # noqa: BLE001
-            extra = {}
-        before = len(extra.get("knapper", []))
-        extra["knapper"] = [x for x in extra.get("knapper", []) if int(x["id"]) != oid]
-        if len(extra["knapper"]) == before:
-            return {"ok": False, "feil": "fant ikke knappen blant de som er lagt til fra nettsiden"}
-        with open(EXTRA_FILE, "w", encoding="utf-8") as f:
+            return {}
+
+    def _write_extra(self, extra):
+        tmp = EXTRA_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(extra, f, indent=2, ensure_ascii=False)
-        BUTTONS[:] = [b for b in BUTTONS if not (b[2] == oid and b[0] == "Knapper")]
-        IDMAP.expected.pop(oid, None)
+        os.replace(tmp, EXTRA_FILE)
+
+    @staticmethod
+    def _drop_from_lists(oid):
+        """Fjerner en enhet lagt til fra nettsiden fra listene i minnet."""
+        xc.LIGHTS[:] = [x for x in xc.LIGHTS if x[2] != oid]
+        xc.SWITCHES[:] = [x for x in xc.SWITCHES if x[2] != oid]
+        BUTTONS[:] = [x for x in BUTTONS if x[2] != oid]
+
+    def _refresh(self):
+        ids = rebuild_registry()
+        if LINK:
+            LINK.subscribe(ids)
+        client = MQTT_STATE["client"]
+        if client:
+            publish_discovery(client)
+
+    def remove_extra(self, body):
+        """Fjerner en enhet som er lagt til fra nettsiden (ikke de faste)."""
+        oid = int(body.get("id"))
+        extra = self._read_extra()
+        kind = next((k for k in ("lys", "brytere", "knapper")
+                     if any(int(x["id"]) == oid for x in extra.get(k, []))), None)
+        if kind is None:
+            return {"ok": False, "feil": "fant ikke enheten blant de som er lagt til fra nettsiden"}
+        extra[kind] = [x for x in extra[kind] if int(x["id"]) != oid]
+        self._write_extra(extra)
+        self._drop_from_lists(oid)
+        if kind == "knapper":
+            IDMAP.expected.pop(oid, None)
         rebuild_registry()
         client = MQTT_STATE["client"]
         if client:
-            client.publish(f"{DISCOVERY_PREFIX}/event/xcomfort_in_{oid}/config", "", qos=1, retain=True)
-        log.info("Fjernet knapp %s fra HA (fra nettsiden)", oid)
+            topic = {"lys": f"light/xcomfort_{oid}", "brytere": f"switch/xcomfort_{oid}",
+                     "knapper": f"event/xcomfort_in_{oid}"}[kind]
+            client.publish(f"{DISCOVERY_PREFIX}/{topic}/config", "", qos=1, retain=True)
+            if kind == "brytere":
+                client.publish(f"{DISCOVERY_PREFIX}/light/xcomfort_onoff_{oid}/config", "", qos=1, retain=True)
+        log.info("Fjernet %s fra HA (fra nettsiden)", oid)
         return {"ok": True}
+
+    def update_extra(self, body):
+        """Gir en enhet lagt til fra nettsiden nytt navn og/eller rom."""
+        oid = int(body.get("id"))
+        extra = self._read_extra()
+        for kind in ("lys", "brytere", "knapper"):
+            for item in extra.get(kind, []):
+                if int(item["id"]) != oid:
+                    continue
+                if str(body.get("navn") or "").strip():
+                    item["navn"] = str(body["navn"]).strip()[:60]
+                if str(body.get("sone") or "").strip():
+                    item["sone"] = str(body["sone"]).strip()[:40]
+                self._write_extra(extra)
+                self._drop_from_lists(oid)
+                load_extras()
+                self._refresh()
+                log.info("Endret %s: %s i %s", oid, item["navn"], item.get("sone", "-"))
+                return {"ok": True}
+        return {"ok": False, "feil": "fant ikke enheten blant de som er lagt til fra nettsiden"}
 
     def command(self, body):
         kind, smux, value = body.get("type"), int(body.get("id")), str(body.get("value"))
@@ -2202,13 +2471,20 @@ class Api:
         cands = scanner.candidates(SCANNER.objects, known)
         added = []
         for kind in ("lys", "brytere", "knapper"):
-            for oid in body.get(kind, []):
-                item = next((c for c in cands[kind] if c["id"] == int(oid)), None)
+            for entry in body.get(kind, []):
+                want = entry if isinstance(entry, dict) else {"id": entry}
+                oid = int(want["id"])
+                item = next((dict(c) for c in cands[kind] if c["id"] == oid), None)
                 if item is None and kind == "knapper" and \
                         (int(oid) in SCANNER.objects or int(oid) in RECENT_UNKNOWN):
                     # Hvilket som helst objekt kan foelges som knapp/hendelse
                     name = (SCANNER.objects.get(int(oid)) or RECENT_UNKNOWN[int(oid)])[0]
                     item = {"id": int(oid), "navn": scanner.pretty(name.split("_", 1)[-1]), "objekt": name}
+                if item:
+                    if str(want.get("navn") or "").strip():
+                        item["navn"] = str(want["navn"]).strip()[:60]
+                    if str(want.get("sone") or "").strip():
+                        item["sone"] = str(want["sone"]).strip()[:40]
                 if item and not any(x["id"] == item["id"] for x in extra.get(kind, [])):
                     extra.setdefault(kind, []).append(item)
                     added.append(item["navn"])
@@ -2260,7 +2536,7 @@ def main():
     MARKISER_CTRL.client = client
 
     global LINK
-    merge_seed_cache()
+    apply_profile()
     start_usb_stick()
     load_extras()
     ids = rebuild_registry()

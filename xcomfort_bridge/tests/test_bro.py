@@ -1014,6 +1014,213 @@ class TestUsbLesing(unittest.TestCase):
         self.assertTrue(st.healthy())
 
 
+class TestUsbSattInnIgjen(unittest.TestCase):
+    def _sysfs(self, tmp, name, vid, pid, bus, dev, majmin):
+        d = os.path.join(tmp, "sys", name)
+        os.makedirs(d)
+        for f, v in (("idVendor", vid), ("idProduct", pid), ("busnum", bus), ("devnum", dev), ("dev", majmin)):
+            with open(os.path.join(d, f), "w") as fh:
+                fh.write(v + "\n")
+
+    def test_lager_enhetsfil_for_pinne_satt_inn_etterpaa(self):
+        import usbstick
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            self._sysfs(tmp, "1-2", "188a", "1102", "1", "7", "189:6")
+            self._sysfs(tmp, "1-3", "046d", "c52b", "1", "8", "189:7")   # en mus, skal ignoreres
+            made = []
+            with mock.patch.object(usbstick.os, "mknod", lambda p, m, d: made.append((p, os.major(d), os.minor(d)))):
+                n = usbstick.ensure_dev_node(os.path.join(tmp, "sys"), os.path.join(tmp, "dev"))
+            self.assertEqual(n, 1)
+            self.assertEqual(made, [(os.path.join(tmp, "dev", "001", "007"), 189, 6)])
+
+    def test_finnes_filen_lages_ingenting(self):
+        import usbstick
+        with tempfile.TemporaryDirectory() as tmp:
+            self._sysfs(tmp, "1-2", "188a", "1102", "1", "7", "189:6")
+            os.makedirs(os.path.join(tmp, "dev", "001"))
+            open(os.path.join(tmp, "dev", "001", "007"), "w").close()
+            self.assertEqual(usbstick.ensure_dev_node(os.path.join(tmp, "sys"), os.path.join(tmp, "dev")), 0)
+
+    def test_ny_libusb_sesjon_hver_gang(self):
+        import importlib.util
+        if importlib.util.find_spec("usb") is None:
+            self.skipTest("pyusb ikke installert")
+        import usbstick
+        a, b = usbstick._fresh_backend(), usbstick._fresh_backend()
+        if a is None:
+            self.skipTest("libusb ikke tilgjengelig")
+        self.assertIsNot(a, b)
+        usbstick._free_backend(a)
+        usbstick._free_backend(b)
+
+    def test_finner_pinnen_igjen_uten_omstart(self):
+        import usbstick
+        state = {"plugged": False}
+        tr = FakeTransport()
+        st = usbstick.UsbStick(transport_factory=lambda: tr if state["plugged"] else None)
+        old = usbstick.RETRY_OPEN_S
+        usbstick.RETRY_OPEN_S = 0.05
+        try:
+            threading.Thread(target=st.run, daemon=True).start()
+            time.sleep(0.2)
+            self.assertFalse(st.healthy())
+            state["plugged"] = True
+            time.sleep(1.5)
+            self.assertTrue(st.healthy())
+        finally:
+            st.stopping = True
+            usbstick.RETRY_OPEN_S = old
+
+
+class TestAnlegg(unittest.TestCase):
+    """Andre enn forfatteren skal ikke få hans enhetsliste."""
+
+    def _bridge(self, names):
+        fake = FakeHM(names=names)
+        bro, xc = load_bridge(fake)
+        bro.PROFILE_FILE = os.path.join(os.path.dirname(bro.EXTRA_FILE), "anlegg.json")
+        return fake, bro, xc
+
+    def test_eget_anlegg_gjenkjennes_paa_navn(self):
+        import json as _j
+        with open(os.path.join(os.path.dirname(__file__), "..", "seed_cache.json"), encoding="utf-8") as f:
+            seed = _j.load(f)
+        names = {int(k): v["name"] for k, v in seed.items()}
+        fake, bro, xc = self._bridge(names)
+        try:
+            n = len(xc.LIGHTS)
+            bro.apply_profile()
+            self.assertTrue(bro.PROFILE["innebygd"])
+            self.assertEqual(len(xc.LIGHTS), n)
+            with open(bro.PROFILE_FILE) as f:
+                self.assertEqual(_j.load(f), {"innebygd": True})
+        finally:
+            fake.close()
+
+    def test_noen_omdopte_objekter_gjor_ingenting(self):
+        import json as _j
+        with open(os.path.join(os.path.dirname(__file__), "..", "seed_cache.json"), encoding="utf-8") as f:
+            seed = _j.load(f)
+        first = sorted(seed)[:2]
+        fake, bro, xc = self._bridge({int(k): seed[k]["name"] for k in first})   # bare 2 av 12 stemmer
+        try:
+            self.assertTrue(bro._names_match_seed(seed))
+        finally:
+            fake.close()
+        fake, bro, xc = self._bridge({int(first[0]): seed[first[0]]["name"]})    # 1 treff er ikke nok
+        try:
+            self.assertFalse(bro._names_match_seed(seed))
+        finally:
+            fake.close()
+
+    def test_nytt_anlegg_starter_tomt(self):
+        fake, bro, xc = self._bridge({})
+        try:
+            bro.apply_profile()
+            self.assertFalse(bro.PROFILE["innebygd"])
+            self.assertEqual((xc.LIGHTS, xc.SWITCHES, xc.MARKISER, xc.THERMOSTATS, bro.BUTTONS),
+                             ([], [], [], [], []))
+            self.assertEqual(bro.MARKISER_CTRL.markiser, {})
+            self.assertEqual(bro.rebuild_registry(), set())
+            client = FakeClient()
+            bro.publish_discovery(client)
+            self.assertFalse([t for t, p in client.published if p and "/light/" in t])
+            self.assertFalse([t for t, p in client.published if "/button/" in t])
+            self.assertTrue(bro.Api().status()["nytt_anlegg"])
+        finally:
+            fake.close()
+
+    def test_lagret_valg_brukes(self):
+        fake, bro, xc = self._bridge({})
+        try:
+            with open(bro.PROFILE_FILE, "w") as f:
+                f.write('{"innebygd": true}')
+            self.assertTrue(bro.decide_profile(check=lambda seed: self.fail("skal ikke spørre")))
+        finally:
+            fake.close()
+
+    def test_home_manager_svarer_ikke(self):
+        fake, bro, xc = self._bridge({})
+        try:
+            self.assertFalse(bro.decide_profile(check=lambda seed: None))
+            self.assertFalse(os.path.exists(bro.PROFILE_FILE))   # sjekkes igjen neste gang
+        finally:
+            fake.close()
+
+    def test_legg_til_med_navn_og_rom_og_endre_og_fjern(self):
+        fake, bro, xc = self._bridge({})
+        try:
+            bro.clear_builtin_devices()
+            bro.SCANNER.objects = {500: ("D_TaklampeStue", 21), 501: ("M_D_TaklampeStue_Val", 23),
+                                   502: ("B_D_TaklampeStue_SET", 23), 600: ("IN_Stue_BR1", 11)}
+            api = bro.Api()
+            r = api.add_extra({"lys": [{"id": 500, "navn": "Taklampe", "sone": "Stue"}], "knapper": [600]})
+            self.assertEqual(r["lagt_til"], ["Taklampe", "Stue BR1"])
+            self.assertEqual(xc.LIGHTS, [("Stue", "Taklampe", 500)])
+            self.assertEqual(xc.load_cache()["500"]["val_id"], 501)
+            devs = {d["id"]: d for d in api.devices()}
+            self.assertTrue(devs[500]["ekstra"] and devs[600]["ekstra"])
+            self.assertEqual(devs[600]["sone"], "Stue")
+            self.assertTrue(api.update_extra({"id": 500, "navn": "Tak", "sone": "Kjøkken"})["ok"])
+            self.assertEqual(xc.LIGHTS, [("Kjøkken", "Tak", 500)])
+            client = FakeClient()
+            bro.MQTT_STATE["client"] = client
+            self.assertTrue(api.remove_extra({"id": 500})["ok"])
+            self.assertEqual(xc.LIGHTS, [])
+            self.assertEqual(client.last("homeassistant/light/xcomfort_500/config"), "")
+            self.assertFalse(api.remove_extra({"id": 999})["ok"])
+            bro.MQTT_STATE["client"] = None
+        finally:
+            fake.close()
+
+
+class TestUsbLaering(unittest.TestCase):
+    def test_laerer_hvilke_dimmere_et_lys_styrer(self):
+        fake = FakeHM()
+        try:
+            bro, xc = load_bridge(fake)
+            a, b = xc.LIGHTS[0][2], xc.LIGHTS[1][2]
+            dimmere = {a: [111, 112], b: []}      # lys b svarer ikke
+
+            class Stick:
+                def healthy(self):
+                    return True
+            bro.STICK = Stick()
+            bro.LEARN_WINDOW_S = 0.05
+            sent = []
+
+            def fake_queue(kind, smux, payload):
+                sent.append((smux, json.loads(payload)))
+                self.assertIn(smux, bro._learning)          # skal gå via Home Manager
+                bro._on_usb_radio(b"", (0x5A, 6519513, 4242))  # tilfeldig trafikk, bare første gang
+                for s in dimmere[smux]:
+                    bro._on_usb_radio(b"", (0x5A, 6519513, s))
+                bro._on_usb_radio(b"", (0x01, 111, 128))   # kvittering til pinnen, ikke en kommando
+            bro._queue_command = fake_queue
+            # 4242 høres bare i første runde:
+            orig = bro._on_usb_radio
+            seen = {"n": 0}
+
+            def radio(frame, info):
+                if info[2] == 4242:
+                    seen["n"] += 1
+                    if seen["n"] > 1:
+                        return
+                orig(frame, info)
+            bro._on_usb_radio = radio
+            bro.publish_state(FakeClient(), bro.light_state_topic(a), json.dumps({"state": "ON", "brightness": 40}))
+            bro.learn_usb_map([a, b])
+            self.assertEqual(bro.LEARN["resultat"], {a: [111, 112]})
+            self.assertEqual(len(bro.LEARN["uten_svar"]), 1)
+            self.assertEqual(bro.load_usb_map()[a], [111, 112])
+            self.assertEqual(sent[0], (a, {"state": "ON", "brightness": 40}))
+            self.assertFalse(bro.LEARN["kjorer"])
+            self.assertEqual(bro._learning, set())
+        finally:
+            fake.close()
+
+
 class TestUsbOmsending(unittest.TestCase):
     def test_proever_igjen_naar_kvittering_mangler(self):
         import usbstick

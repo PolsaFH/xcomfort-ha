@@ -1,5 +1,46 @@
 # Endringslogg – xComfort MQTT-bro
 
+## 2.8.0 (2026-11-02)
+
+Klar for andre anlegg enn det appen ble laget på.
+
+### Nytt
+- **Virker på alle anlegg.** Før var listen over lys, brytere, markiser og
+  termostater skrevet inn i koden for ett bestemt hus. Hos andre ville de
+  numrene pekt på helt andre ting i Home Manager. Nå sjekker appen ved første
+  oppstart om navnene i Home Manager stemmer. Gjør de ikke det, starter appen
+  tom og lar deg velge enhetene selv. Det opprinnelige anlegget merker ingen
+  forskjell.
+- **Veiviser for nye brukere.** Hjem-fanen viser hva du må gjøre når appen er
+  ny: søk, velg, ferdig.
+- **Ny fane «Enheter».** Søk i Home Manager, og legg til lys, brytere og
+  knapper med eget navn og rom i én omgang. Knapper får rom og navn foreslått
+  ut fra navnet i Home Manager.
+- **Endre navn og rom** på enheter du har lagt til, med blyanten under Rom og
+  Knapper. Der kan de også fjernes. Gjelder nå lys og brytere, ikke bare
+  knapper.
+- **USB-pinnen lærer kartet selv.** «Finn dimmere» under USB-pinne sender en
+  kommando via Home Manager til ett lys om gangen og lytter på hvilke dimmere
+  som får den. Ingen MRF-eksport, xSetup-backup eller PC-skript trengs lenger.
+  Hver dimmer må høres to ganger for å telle, så tilfeldig trafikk i huset
+  ikke blir med.
+- **Egen fane for USB-pinnen**, med tydelige tall i stedet for en lang
+  tekstlinje. Rå trafikk fra Home Manager er flyttet til Logg.
+- Ikon og logo i appbutikken, og en kort veiledning under appens
+  Dokumentasjon-fane.
+
+### Rettet
+- **USB-pinnen ble ikke funnet igjen etter at den var tatt ut og satt inn,
+  før appen ble startet på nytt.** USB-biblioteket husket bare enhetene som
+  fantes da appen startet, og får ikke beskjed om nye enheter inne i appen.
+  Nå starter appen en ny USB-økt hver gang den ser etter pinnen, og lager
+  selv enhetsfilen hvis den mangler. Pinnen blir funnet innen 10 sekunder.
+- Melding om at pinnen ikke kunne åpnes skrives bare én gang, ikke hvert 10.
+  sekund.
+- Knappen «Resett markiser» lages bare når det finnes markiser.
+- Faste versjoner av paho-mqtt og pyusb i appen, så en ny versjon av et
+  bibliotek ikke kan ødelegge noe.
+
 ## 2.7.1 (2026-11-01)
 
 Gjennomgang av koden og loggene fra 2.7.0. Ingen nye funksjoner, bare rettelser.

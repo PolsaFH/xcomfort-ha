@@ -22,7 +22,7 @@ configuration:
     description: Hvor ofte broen leser av alle enheter for å se endringer gjort utenfor HA.
   markise_posisjon:
     name: Markise-posisjon (tidsbasert)
-    description: Regner ut omtrentlig posisjon (0–100 %) ut fra kjøretid, og lar HA sette posisjon direkte.
+    description: Regner ut omtrentlig posisjon (0–100 %) ut fra kjøretid, og lar HA sette posisjon direkte. Markise-innstillingene gjelder foreløpig bare markiser som er lagt inn i koden.
   markise_kjoretid_balkong:
     name: Kjøretid balkong (sek)
     description: Tid fra helt inne til helt ute.
@@ -44,10 +44,10 @@ configuration:
     description: Holder en forbindelse åpen mot Home Manager og får endringer med en gang (under 1 sek) i stedet for å vente på neste avlesning. Knapper blir egne hendelses-enheter. Slå av bare ved feilsøking.
   lysbrytere_som_lys:
     name: Lysbrytere også som lys
-    description: Lager i tillegg en lys-enhet for hver av-på-lysbryter (f.eks. taklamper), så de havner under Lys i HA og Google Home. De gamle bryter-enhetene beholdes uendret.
+    description: Lager i tillegg en lys-enhet for de av/på-bryterne som er lagt inn i koden som lys (f.eks. taklamper), så de havner under Lys i HA og Google Home. Bryter-enhetene beholdes.
   lysstyring:
     name: Lysstyring
-    description: "hybrid = USB-pinnen først, Home Manager hvis pinnen mangler eller en dimmer ikke svarer (anbefalt). Bolker til mer enn 6 dimmere (f.eks. alle utelys) går rett via Home Manager, fordi det er raskere. pinne = bare USB-pinnen, ingen reserve. home_manager = bare Home Manager, slik det var før pinnen. Lys uten USB-kart går alltid via Home Manager. Brytere, termostater og markiser går alltid via Home Manager."
+    description: "hybrid = USB-pinnen først, Home Manager hvis pinnen mangler eller en dimmer ikke svarer (anbefalt, og helt trygt uten pinne). Bolker til mer enn 6 dimmere (f.eks. alle utelys) går rett via Home Manager, fordi det er raskere. pinne = bare USB-pinnen, ingen reserve. home_manager = bare Home Manager, slik det var før pinnen. Lys uten USB-kart går alltid via Home Manager. Brytere, termostater og markiser går alltid via Home Manager."
   usb_pinne:
     name: (Gammel) Bruk USB-pinne
     description: "Erstattet av «Lysstyring». La stå tom."

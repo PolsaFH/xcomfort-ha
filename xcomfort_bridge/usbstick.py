@@ -24,7 +24,9 @@ Home Manager som før.
 
 import collections
 import logging
+import os
 import random
+import stat
 import threading
 import time
 
@@ -33,7 +35,7 @@ log = logging.getLogger("xcomfort.usb")
 VID, PID = 0x188A, 0x1102
 PACKET = 62
 STICK_ADDR = 128               # pinnens egen adresse på radio
-RETRY_OPEN_S = 30.0
+RETRY_OPEN_S = 10.0             # hvor ofte vi ser etter pinnen når den mangler
 FRAME_GAP_S = 0.06             # minste pause mellom radiomeldinger
 ACK_WAIT_S = 0.35              # så lenge vi venter på kvittering før neste dimmer
 ACK_BUDGET_S = 2.5             # maks total ventetid per bolk (resten sendes uten å vente)
@@ -93,6 +95,73 @@ class TransientUsbError(IOError):
     """En enkelt lesing feilet, men pinnen virker (f.eks. overflow)."""
 
 
+def _sysfs_sticks(root="/sys/bus/usb/devices"):
+    """Finner pinnen i sysfs (det kjernen ser akkurat nå). Returnerer liste
+    med (bus, enhet, major, minor)."""
+    found = []
+    try:
+        names = os.listdir(root)
+    except OSError:
+        return found
+
+    def rd(d, f):
+        with open(os.path.join(root, d, f), encoding="ascii") as fh:
+            return fh.read().strip()
+
+    for d in names:
+        try:
+            if int(rd(d, "idVendor"), 16) != VID or int(rd(d, "idProduct"), 16) != PID:
+                continue
+            major, minor = (int(x) for x in rd(d, "dev").split(":"))
+            found.append((int(rd(d, "busnum")), int(rd(d, "devnum")), major, minor))
+        except (OSError, ValueError):
+            continue
+    return found
+
+
+def ensure_dev_node(sysfs_root="/sys/bus/usb/devices", dev_root="/dev/bus/usb"):
+    """Når pinnen settes inn mens appen kjører, får den et nytt nummer, og
+    filen /dev/bus/usb/<bus>/<enhet> finnes ikke alltid inne i appen. Da
+    lager vi den selv ut fra sysfs. Returnerer antall filer som ble laget."""
+    made = 0
+    for bus, devnum, major, minor in _sysfs_sticks(sysfs_root):
+        path = os.path.join(dev_root, f"{bus:03d}", f"{devnum:03d}")
+        if os.path.exists(path):
+            continue
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            os.mknod(path, 0o660 | stat.S_IFCHR, os.makedev(major, minor))
+            made += 1
+            log.info("Laget %s for USB-pinnen (satt inn etter at appen startet)", path)
+        except OSError as e:
+            log.warning("USB-pinnen er satt inn, men appen fikk ikke tilgang til den (%s). "
+                        "Start appen på nytt.", e)
+    return made
+
+
+def _fresh_backend():
+    """Ny libusb-sesjon for hvert søk. libusb husker hvilke enheter som fantes
+    da den startet, og inne i appen får den ikke beskjed når en ny enhet
+    kobles til. Uten dette ble pinnen ikke funnet igjen før omstart."""
+    try:
+        import usb.backend.libusb1 as lb
+        if lb.get_backend() is None:
+            return None
+        return lb._LibUSB(lb._lib)   # noqa: SLF001
+    except Exception as e:  # noqa: BLE001
+        log.debug("Kunne ikke lage ny libusb-sesjon: %s", e)
+        return None
+
+
+def _free_backend(backend):
+    """Lukker libusb-sesjonen. finalize() i pyusb kan kalles flere ganger
+    (libusb_exit direkte ga dobbel lukking og krasj når Python ryddet opp)."""
+    try:
+        backend.finalize()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 class PyUsbTransport:
     """Den ekte USB-forbindelsen (pyusb/libusb). Brukes i appen."""
 
@@ -107,8 +176,12 @@ class PyUsbTransport:
         except ImportError:
             log.info("pyusb er ikke installert -- USB-pinnen brukes ikke")
             return None
-        dev = usb.core.find(idVendor=VID, idProduct=PID)
+        ensure_dev_node()
+        backend = _fresh_backend()
+        dev = usb.core.find(idVendor=VID, idProduct=PID, backend=backend)
         if dev is None:
+            if backend is not None:
+                _free_backend(backend)   # ingen enheter holder på den
             return None
         try:
             if dev.is_kernel_driver_active(0):
@@ -176,6 +249,7 @@ class UsbStick:
         self.failed = 0
         self.last_error = ""
         self._logged_missing = False
+        self._logged_open_fail = False
         self.rx_frames = 0
         self.rx_radio = 0
         self.rx_acks = 0
@@ -193,7 +267,9 @@ class UsbStick:
             t = self.factory()
         except Exception as e:  # noqa: BLE001
             self.last_error = str(e)
-            log.warning("USB-pinnen ble funnet, men kunne ikke åpnes: %s", e)
+            if not self._logged_open_fail:   # ikke spam loggen hvert 10. sekund
+                self._logged_open_fail = True
+                log.warning("USB-pinnen ble funnet, men kunne ikke åpnes: %s", e)
             return False
         if t is None:
             if not self._logged_missing:
@@ -224,6 +300,7 @@ class UsbStick:
             self.connected_at = time.time()
             self._warned_deaf = False
         self._logged_missing = False
+        self._logged_open_fail = False
         log.info("USB-pinne klar (%s). Lys styres direkte over radio, Home Manager er reserve.",
                  self.name or "CKOZ-00/13")
         return True

@@ -1,140 +1,250 @@
-# xComfort MQTT-bro for Home Assistant
+<p align="center">
+  <img src="xcomfort_bridge/logo.png" alt="xComfort for Home Assistant" width="320">
+</p>
 
-Styr et **Eaton / Sensio xComfort**-anlegg fra Home Assistant, helt lokalt.
-Ingen eoptHome-app, ingen Eaton-sky, ingen internettilgang nødvendig.
+<h3 align="center">Eaton / Sensio xComfort i Home Assistant. Helt lokalt.</h3>
 
-Broen snakker direkte med xComfort **Home Manager** på det lokale nettverket
-(samme protokoll som eoptHome-appen bruker) og legger alt inn i Home Assistant
-automatisk via MQTT.
+<p align="center">
+  Ingen sky. Ingen app. Ingen ventetid.<br>
+  Lys, brytere, markiser, termostater, sensorer og veggknapper rett inn i Home Assistant,<br>
+  med en valgfri USB-pinne som styrer lysene direkte over radio.
+</p>
+
+<p align="center">
+  <a href="https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FPolsaFH%2Fxcomfort-ha"><img src="https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg" alt="Legg til i Home Assistant"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Home%20Assistant-app-41BDF5?logo=homeassistant&logoColor=white" alt="Home Assistant-app">
+  <img src="https://img.shields.io/badge/100%25-lokalt-12a150" alt="100 % lokalt">
+  <img src="https://img.shields.io/badge/sky-ikke%20n%C3%B8dvendig-7c3aed" alt="Ingen sky">
+  <img src="https://github.com/PolsaFH/xcomfort-ha/actions/workflows/tester.yml/badge.svg" alt="Tester">
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="bilder/hjem-mork.png">
+    <img src="bilder/hjem.png" alt="Nettsiden i Home Assistant" width="900">
+  </picture>
+</p>
 
 > [!WARNING]
-> **Under utvikling.** Denne appen er ikke ferdig. Den er laget og testet på
-> ett bestemt anlegg, og du kan oppleve feil eller ting som ikke fungerer på
-> ditt. Vi jobber med å gjøre den klar og stabil for alle. Det vil komme
-> endringer, også i innstillinger og enheter, så les
-> [endringsloggen](xcomfort_bridge/CHANGELOG.md) før du oppdaterer, og ta en
-> sikkerhetskopi av Home Assistant først. Si gjerne fra om problemer under
-> *Issues*.
->
-> **Work in progress.** This app is not finished yet and may not work on
-> your installation. Expect changes, including to settings and entities.
+> **Tidlig versjon.** Appen er laget på og testet grundig i ett hus med ca. 100 xComfort-enheter.
+> Nå åpnes den for flere. Den gjør ingenting med anlegget ditt før du selv velger hva som skal inn,
+> men ta en sikkerhetskopi av Home Assistant først, og si gjerne fra under
+> [Issues](https://github.com/PolsaFH/xcomfort-ha/issues) hvis noe ikke virker.
 
-> **English summary:** A Home Assistant app (add-on) that bridges an Eaton /
-> Sensio xComfort *Home Manager* to Home Assistant over MQTT, fully local
-> (TCP port 10023, no cloud). Lights, switches, sensors, thermostats, awnings
-> and wall buttons show up automatically via MQTT discovery. The docs below
-> are in Norwegian. Note: the device list is currently written for one
-> specific installation, see [Tilpasse til ditt eget anlegg](#tilpasse-til-ditt-eget-anlegg).
+<details>
+<summary><b>🇬🇧 English summary</b></summary>
+
+A Home Assistant app (add-on) that connects an **Eaton / Sensio xComfort Home Manager** (the controller
+used with the eoptHome app) to Home Assistant, **fully locally** over the same TCP protocol the official
+app uses (port 10023). No cloud, no app, no internet.
+
+- Lights, switches and wall buttons are discovered from the Home Manager and added from a built-in web page.
+- Changes made with wall switches show up in Home Assistant in under a second.
+- Optional: plug in the **CKOZ-00/13 USB stick** (the one used by MRF) and lights are controlled directly
+  over radio, with automatic fallback to the Home Manager. The app can learn which dimmers belong to
+  each light by itself.
+- Everything appears through MQTT discovery. No YAML needed.
+
+The documentation is in Norwegian, since xComfort/Sensio is mostly used in Norway. Issues in English are welcome.
+</details>
 
 ---
 
 ## Innhold
 
-- [Hva får du](#hva-får-du)
-- [Slik fungerer det](#slik-fungerer-det)
-- [Før du starter](#før-du-starter)
-- [Installere](#installere)
+- [Hvorfor](#hvorfor)
+- [Dette får du](#dette-får-du)
+- [Kom i gang på 10 minutter](#kom-i-gang-på-10-minutter)
+- [Nettsiden](#nettsiden)
+- [USB-pinnen: lys på et øyeblikk](#usb-pinnen-lys-på-et-øyeblikk)
+- [Veggknapper i automasjoner](#veggknapper-i-automasjoner)
 - [Innstillinger](#innstillinger)
-- [Nettsiden i Home Assistant](#nettsiden-i-home-assistant)
-- [Veggknapper og automasjoner](#veggknapper-og-automasjoner)
+- [Slik virker det](#slik-virker-det)
 - [Når du endrer noe i xSetup eller MRF](#når-du-endrer-noe-i-xsetup-eller-mrf)
-- [Markiser](#markiser)
-- [USB-pinne (valgfritt)](#usb-pinne-valgfritt-eksperimentelt)
-- [Tilpasse til ditt eget anlegg](#tilpasse-til-ditt-eget-anlegg)
 - [Feilsøking](#feilsøking)
+- [Begrensninger](#begrensninger)
 - [Sikkerhet](#sikkerhet)
 - [For utviklere](#for-utviklere)
 
 ---
 
-## Hva får du
+## Hvorfor
 
-| I xComfort | I Home Assistant | Merknad |
-|---|---|---|
-| Dimmere | `light` med lysstyrke | Endringer fra veggbryter vises i HA på under 1 sek |
-| Av/på-aktuatorer | `switch` (valgfritt også `light`) | F.eks. terrassevarmere, vifte, taklamper |
-| Markiser / jalousier | `cover` med Inn / Stopp / Ut og omtrentlig posisjon | Posisjon regnes ut fra kjøretid |
-| Romtermostater | `climate` | Måltemperatur, romtemperatur og ventilåpning |
-| Sol-, vind- og temperaturfølere | `sensor` | |
-| Alarmer / innganger | `binary_sensor` | F.eks. ventilasjonsalarmer |
-| Veggknapper (Generell inngang) | `event` | Kort trykk, langt trykk, slipp. Perfekt for automasjoner |
+xComfort er et solid radiobasert anlegg, men det er låst til eoptHome-appen og Eatons sky. Det betyr
+treg respons, ingen ordentlig kobling til resten av hjemmet, og at alt stopper hvis skyen gjør det.
 
-I tillegg får du en egen **nettside i sidepanelet** (xComfort) med status,
-alle rom, knapper, logg og verktøy.
+Denne appen snakker direkte med Home Manager på ditt lokale nettverk, akkurat som eoptHome-appen gjør
+selv. Protokollen er kartlagt fra bunnen av. Resultatet er at xComfort blir en helt vanlig del av Home
+Assistant: i dashbord, automasjoner, stemmestyring og Google Home eller Apple Home.
 
 ---
 
-## Slik fungerer det
+## Dette får du
 
+| | |
+|---|---|
+| 💡 **Lys med lysstyrke** | Dimmere blir `light` i Home Assistant. Endringer fra veggbryteren vises på under ett sekund. |
+| 🔌 **Av/på-brytere** | Terrassevarmere, vifter, lyskastere og andre aktuatorer blir `switch`. |
+| 🔘 **Veggknapper som smarte knapper** | Kort trykk, langt trykk og slipp blir hendelser. Bruk dem til musikk, scener eller hva som helst. |
+| 📡 **USB-pinne (valgfritt)** | Lysene styres direkte over radio og reagerer med en gang. Home Manager tar over hvis en dimmer ikke svarer. |
+| 🧠 **Lærer selv** | Finner enhetene i Home Manager, og finner hvilke dimmere hvert lys styrer. Ingen nummer å skrive inn. |
+| 🔁 **Tåler endringer** | Laster du opp fra xSetup og objektene får nye numre, finner appen dem igjen på navn. Automasjonene dine fortsetter å virke. |
+| 🖥️ **Egen nettside** | Status, rom, knapper, logg og verktøy, rett i sidepanelet i Home Assistant. Mørk modus og mobil. |
+| 📊 **Diagnostikk** | Responstid, radiotrafikk og feil som egne sensorer, så du kan få varsel hvis noe går galt. |
+| 🔒 **100 % lokalt** | Ingen konto, ingen sky, ingen internett. Virker også når nettet er nede. |
+
+---
+
+## Kom i gang på 10 minutter
+
+### Dette trenger du
+
+- **Home Assistant OS eller Supervised.** Det er der apper (add-ons) finnes.
+- **Mosquitto broker**-appen og **MQTT**-integrasjonen. Har du ikke det: *Innstillinger → Apper →
+  Appbutikk → Mosquitto broker → Installer → Start*. HA foreslår så MQTT-integrasjonen av seg selv.
+- **En egen bruker til appen**, f.eks. `xcomfort`: *Innstillinger → Personer → Brukere → Legg til*.
+  Mosquitto godtar Home Assistant-brukere automatisk.
+- **IP-adressen til Home Manager.** Gi den fast adresse i ruteren (DHCP-reservasjon), ellers mister
+  appen kontakten den dagen adressen endrer seg.
+
+Du trenger **ikke** eoptHome-appen, Eaton-kontoen eller internett.
+
+### 1. Installer
+
+Trykk på knappen øverst, eller gjør det for hånd:
+
+1. *Innstillinger → Apper → Appbutikk → ⋮ → Repositories*
+2. Lim inn `https://github.com/PolsaFH/xcomfort-ha` og trykk **Legg til**.
+3. Finn **xComfort MQTT-bro** i listen og trykk **Installer**.
+
+### 2. Fyll inn tre ting
+
+Under fanen **Konfigurasjon**:
+
+| Felt | Eksempel |
+|---|---|
+| Home Manager IP | `192.168.1.50` |
+| MQTT-brukernavn | `xcomfort` |
+| MQTT-passord | passordet til brukeren over |
+
+Resten kan stå som det er.
+
+### 3. Start
+
+Under fanen **Info**: slå på **Start ved oppstart**, **Watchdog** og **Vis i sidepanelet**, og trykk
+**Start**.
+
+### 4. Finn enhetene dine
+
+Åpne **xComfort** i sidepanelet. Første gang møter du en veiviser:
+
+<p align="center"><img src="bilder/enheter.png" alt="Legg til enheter" width="820"></p>
+
+1. Trykk **Start søk**. Appen går gjennom alt Home Manager har (10 til 20 minutter, påvirker ikke radioen).
+2. Gi lys, brytere og knapper et navn og et rom.
+3. Trykk **Legg til valgte i Home Assistant**.
+
+Ferdig. Enhetene ligger nå under *Innstillinger → Enheter og tjenester → MQTT*, sortert per rom, og du kan
+bruke dem som alt annet i Home Assistant.
+
+---
+
+## Nettsiden
+
+| Fane | Hva du finner |
+|---|---|
+| **Hjem** | «Alt fungerer», eller nøyaktig hva som er galt. Nøkkeltall, markiser og en levende liste over alt som skjer i huset. |
+| **Rom** | Alle enheter per rom. Trykk for av/på, dra for å dimme, «Slå av alt» per rom. Blyanten endrer navn og rom. |
+| **Knapper** | Alle veggknapper med siste trykk. Trykker du på en ny knapp i huset, dukker den opp her og kan legges til med ett trykk. |
+| **Enheter** | Søk i Home Manager, legg til nye enheter, finn objekter og ta sikkerhetskopi. |
+| **USB-pinne** | Status for pinnen, automatisk læring av hvilke dimmere hvert lys styrer, og feilsøking. |
+| **Logg** | Fargekodet logg med filter, søk, pause og nedlasting, og rå trafikk fra Home Manager. |
+
+<p align="center"><img src="bilder/rom.png" alt="Rom" width="820"></p>
+
+---
+
+## USB-pinnen: lys på et øyeblikk
+
+Home Manager sender lyskommandoer videre over radio, og mange anlegg er satt opp med flere sekunders
+dimmetid. Med xComfort-pinnen **CKOZ-00/13** (den samme USB-pinnen som MRF bruker) i maskinen som kjører
+Home Assistant, sender appen kommandoene **rett til dimmeren**. Lyset reagerer med en gang.
+
+<p align="center"><img src="bilder/usb.png" alt="USB-pinne" width="820"></p>
+
+1. Sett pinnen i Home Assistant-maskinen, helst sentralt i huset. Den kan settes inn og tas ut mens
+   appen kjører.
+2. Åpne **USB-pinne** på nettsiden og trykk **Finn dimmere**. Appen sender en kommando via Home Manager
+   til ett lys om gangen og lytter på hvilke dimmere som får den. Lysene endrer seg ikke synlig.
+3. Ferdig. Lys med dimmere i kartet styres nå direkte.
+
+**Trygt som standard.** Innstillingen **Lysstyring** bestemmer hva som brukes:
+
+| Valg | Betyr |
+|---|---|
+| `hybrid` (standard) | Pinnen først. Hver dimmer får 0,35 sekunder på å svare, og ett nytt forsøk. Har verken pinnen eller Home Manager sett at lyset endret seg etter 3 sekunder, sender Home Manager kommandoen. Store bolker (mer enn 6 dimmere, f.eks. alle utelys) går rett via Home Manager, fordi det er raskere. Uten pinne virker alt som før. |
+| `pinne` | Bare pinnen, uten reserve. |
+| `home_manager` | Bare Home Manager. Pinnen brukes ikke. |
+
+Brytere, termostater og markiser går alltid via Home Manager.
+
+> Pinnen kan bare brukes av ett program om gangen. Skal du bruke MRF, flytt pinnen til PC-en og sett den
+> tilbake etterpå. Appen bruker Home Manager så lenge pinnen er borte, og finner den igjen av seg selv.
+
+<details>
+<summary>Lage kartet selv fra MRF (for spesielt interesserte)</summary>
+
+Har du MRF-eksporten og en xSetup-backup, kan kartet også lages med
+[`verktoy/lag_usb_kart.py`](verktoy/lag_usb_kart.py) og lastes opp under *USB-pinne → Last opp et kart
+fra fil*. Formatet er `{"lys": {"<smuxId>": [serienummer, ...]}}`.
+</details>
+
+---
+
+## Veggknapper i automasjoner
+
+En xComfort-knapp kan styre helt andre ting enn lys: musikk, scener, garasjeport, hva som helst.
+
+**1. Gjør knappen synlig for Home Manager.** I MRF: koble knappen til Home Manager og overfør. I xSetup:
+sett datapunktet til **Generell inngang** og last opp.
+
+**2. Legg den til.** Trykk på knappen i huset. Den dukker opp under **Knapper** på nettsiden. Trykk
+**Legg til i HA**.
+
+**3. Lag en automasjon.** Knappen er en `event`-enhet med disse trykk-typene:
+
+| `event_type` | Betyr |
+|---|---|
+| `kort_opp` / `kort_ned` | Kort trykk på øvre / nedre del |
+| `langt_opp` / `langt_ned` | Holder inne øvre / nedre del |
+| `langt_opp_slipp` / `langt_ned_slipp` | Slipper etter langt trykk |
+
+```yaml
+alias: Stue knapp 4 - kinomodus
+triggers:
+  - trigger: state
+    entity_id: event.stue_brstue4
+    not_from: unavailable
+conditions:
+  - condition: state
+    entity_id: event.stue_brstue4
+    attribute: event_type
+    state: kort_opp
+actions:
+  - action: scene.turn_on
+    target:
+      entity_id: scene.kino
+mode: single
 ```
- Veggbrytere / radio            Lokalt nettverk                 Home Assistant
- ┌────────────┐  radio  ┌──────────────┐ TCP 10023 ┌──────────────┐ MQTT ┌───────────┐
- │ Dimmere,   │ ──────► │ xComfort     │ ◄───────► │ xComfort     │ ◄──► │ Mosquitto │ ◄──► HA-enheter
- │ knapper,   │         │ Home Manager │           │ MQTT-bro     │      │ (MQTT)    │
- │ markiser   │         │              │           │ (denne appen)│      └───────────┘
- └────────────┘         └──────────────┘           └──────────────┘
-```
 
-- Broen holder en forbindelse åpen mot Home Manager og får beskjed med en gang
-  noe endrer seg (noen trykker på en bryter, et lys dimmes osv.).
-- Kommandoer fra HA (slå på lys, kjør markise ut) sendes rett til Home Manager.
-- Alt dukker opp i HA automatisk via **MQTT discovery**. Du trenger ikke skrive
-  noe i `configuration.yaml`.
-- Enhetene får faste `unique_id`-er, så du kan gi dem nye navn, rom og ikoner
-  i HA uten at noe brekker.
-
----
-
-## Før du starter
-
-Du trenger:
-
-1. **Home Assistant OS eller Supervised.** Det er der «Apper» (tidligere
-   «tillegg» / add-ons) finnes. Container- og Core-installasjoner kan ikke kjøre
-   apper.
-2. **Mosquitto broker**-appen installert og startet, og **MQTT**-integrasjonen
-   lagt til under *Innstillinger → Enheter og tjenester*.
-3. En **egen MQTT-bruker** til broen. Enklest: lag en vanlig HA-bruker, for
-   eksempel `xcomfort`, under *Innstillinger → Personer → Brukere*. Mosquitto
-   godtar HA-brukere automatisk.
-4. **Home Manager på samme nettverk** som Home Assistant, med **fast IP-adresse**
-   (sett en DHCP-reservasjon i ruteren, ellers mister broen kontakten når
-   adressen endrer seg).
-
-Du trenger **ikke** eoptHome-appen, Eaton-kontoen eller internett for at
-broen skal virke.
-
----
-
-## Installere
-
-1. I Home Assistant: **Innstillinger → Apper → Appbutikk**.
-2. Trykk **⋮** øverst til høyre → **Repositories**.
-3. Lim inn adressen til dette repoet:
-   ```
-   https://github.com/PolsaFH/xcomfort-ha
-   ```
-   og trykk **Legg til**.
-4. Last inn siden på nytt. Finn **xComfort MQTT-bro** i listen og trykk
-   **Installer**.
-5. Gå til fanen **Konfigurasjon** og fyll inn minst:
-   - **Home Manager IP**: IP-adressen til Home Manager.
-   - **MQTT-brukernavn** og **MQTT-passord**: brukeren fra punkt 3 over.
-6. Gå til fanen **Info**:
-   - Slå på **Start ved oppstart**.
-   - Slå på **Watchdog**, så starter HA broen på nytt hvis den skulle henge.
-   - Slå på **Vis i sidepanelet** for å få nettsiden.
-   - Trykk **Start**.
-7. Åpne fanen **Logg**. Etter noen sekunder skal du se at broen kobler til Home
-   Manager og MQTT, og at enhetene publiseres.
-8. Gå til **Innstillinger → Enheter og tjenester → MQTT**. Der ligger nå alle
-   rommene som enheter med lys, markiser osv.
-
-### Oppdatere
-
-Når en ny versjon er lagt ut, dukker det opp en **Oppdater**-knapp på appen.
-Se [`xcomfort_bridge/CHANGELOG.md`](xcomfort_bridge/CHANGELOG.md) for hva som
-er nytt. Ta gjerne en sikkerhetskopi av HA før store oppdateringer.
+**Tips:**
+- **Dobbeltrykk:** vent 0,8 sekunder med `wait_for_trigger` etter første trykk og se om det kommer ett til.
+- **Volum eller dimming mens du holder inne:** start en løkke på `langt_opp` og stopp den på `langt_opp_slipp` (`mode: restart`).
+- Knappen gjør fortsatt det den er programmert til i xComfort i tillegg. Vil du bare bruke den i Home
+  Assistant, ikke koble den til noen aktuator i MRF.
 
 ---
 
@@ -142,205 +252,61 @@ er nytt. Ta gjerne en sikkerhetskopi av HA før store oppdateringer.
 
 | Innstilling | Standard | Hva den gjør |
 |---|---|---|
-| Home Manager IP | | Lokal IP til Home Manager |
-| Home Manager port | `10023` | Endres nesten aldri |
-| MQTT-megler | `core-mosquitto` | Riktig hvis du bruker Mosquitto-appen |
-| MQTT-port | `1883` | |
-| MQTT-brukernavn / passord | | Brukeren broen logger inn med. Passordet lagres bare i appens innstillinger |
-| Loggnivå | `info` | `debug` logger all trafikk til og fra Home Manager. Bruk ved feilsøking |
-| Avlesningsintervall | `20` sek | Hvor ofte alt leses av som en ekstra sikkerhet |
-| Hurtig status | på | Holder en forbindelse åpen og får endringer på under 1 sek. Kreves for knapper |
-| Lysstyring | `hybrid` | `hybrid`, `pinne` eller `home_manager`, se [USB-pinne](#usb-pinne-valgfritt-eksperimentelt) |
-| Lysbrytere også som lys | av | Lager en ekstra `light` for hver av/på-bryter, så de havner under Lys i HA og Google Home |
-| Markise-posisjon | på | Regner ut omtrentlig posisjon (0-100 %) fra kjøretid |
-| Kjøretid per markise | | Sekunder fra helt inne til helt ute. Mål med stoppeklokke |
-| Pause mellom markise-kommandoer | `0.5` sek | Hindrer at radiotelegrammer kolliderer |
-| Send «stopp» to ganger | på | Alltid trygt, hjelper hvis det første telegrammet ikke kom fram |
-| Gjenta «ut»/«inn» én gang | av | Test først. Noen motorer stopper hvis de får samme kommando to ganger |
+| Home Manager IP | | Lokal IP til Home Manager. Må fylles inn. |
+| Home Manager port | `10023` | Endres nesten aldri. |
+| MQTT-megler / port | `core-mosquitto` / `1883` | Riktig hvis du bruker Mosquitto-appen. |
+| MQTT-brukernavn / passord | | Brukeren appen logger inn med. Lagres bare i appens innstillinger. |
+| Lysstyring | `hybrid` | `hybrid`, `pinne` eller `home_manager`, se [USB-pinnen](#usb-pinnen-lys-på-et-øyeblikk). |
+| Hurtig status | på | Holder en forbindelse åpen og får endringer på under ett sekund. Kreves for knapper. |
+| Avlesningsintervall | `20` sek | Hvor ofte alt leses av hvis hurtig status er av. |
+| Loggnivå | `info` | `debug` logger all trafikk til og fra Home Manager. |
+| Markise-innstillinger | | Kjøretid, pauser og dobbel stopp. Se [Begrensninger](#begrensninger). |
 
 ---
 
-## Nettsiden i Home Assistant
+## Slik virker det
 
-Trykk **xComfort** i sidepanelet. Siden har fem faner:
-
-| Fane | Innhold |
-|---|---|
-| **Hjem** | «Alt fungerer» eller hva som er galt, nøkkeltall, markiser med Inn / Stopp / Ut, og «Hva skjer i huset»: en levende liste over trykk, lys og alarmer |
-| **Rom** | Alle lys, brytere, markiser og termostater per rom. Trykk for av/på, dra for å dimme, «Slå av alt» per rom |
-| **Knapper** | Alle veggknapper med siste trykk. Nye knapper legges til med ett trykk |
-| **Logg** | Fargekodet logg med filter, søk, pause og nedlasting |
-| **Verktøy** | Søk etter nye enheter, søk i alle objekter i Home Manager, sikkerhetskopi og rå trafikk |
-
-Siden fungerer på mobil og har mørk modus.
-
----
-
-## Veggknapper og automasjoner
-
-xComfort-knapper kan brukes som «smarte knapper» i HA, så en knapp kan for
-eksempel styre musikk, scener eller noe helt annet enn lys.
-
-### 1. Gjør knappen synlig for Home Manager
-
-En knapp blir bare synlig for broen hvis den har et **datapunkt** i Home
-Manager:
-
-1. I **MRF**: koble knappen (kanalen) til Home Manager eller en
-   tilleggskontroller og overfør endringene.
-2. I **xSetup**: under *Datapunkter*, sett typen til **Generell inngang** og
-   **last opp** til anlegget.
-
-### 2. Legg den til i broen
-
-1. Trykk på knappen noen ganger.
-2. Åpne nettsiden → **Knapper** (eller **Verktøy**). Under «Knapper du nettopp
-   har trykket på» dukker den opp.
-3. Trykk **Legg til**. Knappen blir en `event`-enhet i HA, i riktig rom.
-
-### 3. Lag en automasjon
-
-Lag en ny automasjon i HA, velg utløseren **Hendelse mottatt** på knappens
-`event`-enhet, og velg hvilken trykk-type som skal reagere:
-
-| Trykk-type (`event_type`) | Betyr |
-|---|---|
-| `kort_opp` | Kort trykk på øvre del |
-| `kort_ned` | Kort trykk på nedre del |
-| `langt_opp` | Holder inne øvre del |
-| `langt_opp_slipp` | Slipper etter langt trykk opp |
-| `langt_ned` | Holder inne nedre del |
-| `langt_ned_slipp` | Slipper etter langt trykk ned |
-
-Eksempel i YAML-modus (automasjonsredigereren → ⋮ → *Rediger i YAML*):
-
-```yaml
-alias: Stue knapp 4 - scene
-triggers:
-  - trigger: event.received
-    target:
-      entity_id: event.stue_brstue4
-    options:
-      event_type: [kort_opp]
-actions:
-  - action: scene.turn_on
-    target:
-      entity_id: scene.stue_dempet
-mode: single
+```mermaid
+flowchart LR
+    subgraph Hus["Huset"]
+        D["Dimmere, aktuatorer,<br/>knapper, markiser"]
+    end
+    subgraph Nett["Lokalt nettverk"]
+        HM["xComfort<br/>Home Manager"]
+    end
+    subgraph HA["Home Assistant-maskinen"]
+        APP["xComfort MQTT-bro<br/>(denne appen)"]
+        USB["USB-pinne<br/>CKOZ-00/13"]
+        MQ["Mosquitto"]
+        CORE["Home Assistant"]
+    end
+    D <-- "radio 868 MHz" --> HM
+    HM <-- "TCP 10023" --> APP
+    APP <--> MQ <--> CORE
+    APP --- USB
+    USB -. "radio, direkte (valgfritt)" .-> D
 ```
 
-**Tips:**
-
-- **Dobbeltrykk** finnes ikke i selve knappen, men kan lages i HA: vent
-  0,8 sek med `wait_for_trigger` etter første trykk og se om det kommer ett
-  til.
-- **Volum eller dimming mens du holder:** start en løkke på `langt_opp` og
-  stopp den på `langt_opp_slipp` (bruk `mode: restart`).
-- Knappen gjør fortsatt det den er programmert til i xComfort (for eksempel
-  styre et lys) i tillegg til automasjonen. Vil du bare bruke den i HA, ikke
-  koble den til noen aktuator i MRF.
+- Appen holder én forbindelse åpen mot Home Manager. Home Manager sier fra med en gang noe endrer seg.
+- Kommandoer fra Home Assistant går rett til Home Manager, eller rett til dimmeren via USB-pinnen.
+- Alt dukker opp via **MQTT discovery**. Ingen `configuration.yaml`.
+- Hver enhet har en fast `unique_id`, så du kan gi den nytt navn, rom og ikon i Home Assistant uten at noe brekker.
 
 ---
 
 ## Når du endrer noe i xSetup eller MRF
 
-**Viktig:** Hver gang du laster opp fra xSetup, kan Home Manager gi mange
-objekter **nye interne numre**. Det gjelder særlig innganger og knapper
-(`IN_...`). Lys beholder som regel numrene sine.
+Hver gang du laster opp fra xSetup, kan Home Manager gi objekter **nye interne numre**, særlig knapper og
+innganger. Appen tar seg av det:
 
-Broen håndterer dette selv:
+- Ved oppstart, hver 6. time og etter hvert søk sjekker den at alt har riktig nummer.
+- Har noe fått nytt nummer, finner den det igjen på navn. I loggen står det «fulgt opp automatisk».
+- `entity_id` og `unique_id` i Home Assistant endres **ikke**.
 
-- Ved oppstart, hver 6. time og etter hvert søk sjekker den at alle knapper og
-  alarmer fortsatt har riktig nummer.
-- Har noe fått nytt nummer, finner den det igjen ut fra navnet og følger det
-  opp automatisk. I loggen står det «har fått nytt nummer ... (fulgt opp
-  automatisk)».
-- Enhetene i HA (`entity_id`, `unique_id`) endres **ikke**, så automasjonene
-  dine fortsetter å virke.
+Kjør gjerne **Enheter → Søk på nytt** etterpå, og ta en ny sikkerhetskopi.
 
-Etter en opplasting fra xSetup er det likevel lurt å:
-
-1. Åpne nettsiden → **Verktøy** → **Start søk**.
-2. Sjekke **Logg** for advarsler om noe som ikke ble funnet.
-3. Ta en ny sikkerhetskopi (se under).
-
-**Felle:** MRF kan vise et datapunkt som ledig selv om xSetup fortsatt bruker
-det. Sjekk alltid i xSetup før du velger datapunktnummer i MRF.
-
-### Sikkerhetskopi
-
-- Nettsiden → **Verktøy** → **Sikkerhetskopi** laster ned broens kjente
-  styre-objekter og listen over alle objekter i Home Manager.
-- Ta også kopi av **MRF-prosjektet** og **xSetup-prosjektet** før du endrer noe
-  i anlegget.
-
----
-
-## Markiser
-
-- Markisene har **ingen posisjonsmåler**. Broen regner ut posisjonen fra hvor
-  lenge motoren har kjørt. Mål kjøretiden fra helt inne til helt ute og legg den
-  inn under Innstillinger.
-- Hvis noen bruker en veggbryter eller fjernkontroll som ikke går via Home
-  Manager, vet ikke broen om det, og posisjonen kan bli feil. Kjør markisen helt
-  inn eller helt ut én gang for å «nullstille» den.
-- Kommandoer sendes med en liten pause imellom så radiotelegrammene ikke
-  kolliderer.
-
----
-
-## USB-pinne (valgfritt, eksperimentelt)
-
-Har du xComfort-pinnen **CKOZ-00/13** (USB-pinnen som brukes til MRF), kan
-broen sende lyskommandoer rett ut på radio i stedet for via Home Manager.
-Lysene reagerer da med en gang. Home Manager brukes fortsatt som reserve og
-for alt annet.
-
-1. Sett pinnen i maskinen som kjører Home Assistant, helst sentralt i huset.
-2. Lag USB-kartet på PC-en med `lag_usb_kart.py` (et eget PC-verktøy, ikke
-   med i dette repoet ennå). Det trenger MRF-eksporten og en xSetup-backup,
-   og lager `usb_kart.json` med hvilke dimmere (serienumre) som hører til
-   hvert lys.
-3. På nettsiden: **Verktøy → USB-pinne → Last opp USB-kart**.
-4. Sjekk at det står «Pinnen er tilkoblet» og at lysene har serienumre.
-
-Innstillingen **Lysstyring** bestemmer hva som brukes:
-
-| Valg | Betyr |
-|---|---|
-| `hybrid` (standard) | Pinnen først. Hver dimmer får inntil 0,35 sekunder på å kvittere, og ett nytt forsøk. Har verken pinnen eller Home Manager sett at lyset endret seg etter 3 sekunder, eller pinnen mangler, brukes Home Manager. Bolker til mer enn 6 dimmere (f.eks. alle utelys) går rett via Home Manager, fordi det er raskere |
-| `pinne` | Bare pinnen, uten reserve |
-| `home_manager` | Bare Home Manager, slik det var før pinnen |
-
-Pinnen kan ikke brukes i MRF og av appen samtidig.
-
-Protokollen mellom pinnen og dimmerne er funnet ved å ta opp trafikken fra
-MRF. Den er ikke dokumentert av Eaton. Se `usbstick.py`.
-
----
-
-## Tilpasse til ditt eget anlegg
-
-Denne broen er laget og testet for **ett bestemt anlegg**. Protokollen er
-generell for xComfort Home Manager, men listen over enheter er foreløpig
-skrevet inn i koden:
-
-| Hva | Hvor |
-|---|---|
-| Dimbare lys `(Sone, Navn, smuxId)` | `LIGHTS` i `xcomfort_bridge/xcomfort_local_control.py` |
-| Av/på-aktuatorer | `SWITCHES` i samme fil |
-| Sensorer og alarmer | `SENSORS` i samme fil |
-| Markiser | `MARKISER` i samme fil, pluss kjøretider i innstillingene |
-| Innganger som følges ekstra nøye | `OBJEKT_NAVN` i `xcomfort_bridge/xcomfort_mqtt_bridge.py` |
-
-`smuxId` er enhetens nummer i Home Manager (objektet `D_<navn>`). Du finner
-dem med **Verktøy → Start søk** og søkefeltet på nettsiden. Søket viser
-alle objekter med navn og nummer.
-
-**Knapper** trenger du ikke skrive inn i koden. De legges til fra nettsiden.
-
-Vil du bruke broen på et annet anlegg og få dette gjort enklere (for eksempel
-at enhetene oppdages automatisk), opprett gjerne en *issue*.
+> **Felle:** MRF kan vise et datapunkt som ledig selv om xSetup fortsatt bruker det. Sjekk alltid i xSetup
+> før du velger datapunkt i MRF.
 
 ---
 
@@ -348,26 +314,40 @@ at enhetene oppdages automatisk), opprett gjerne en *issue*.
 
 | Problem | Prøv dette |
 |---|---|
-| Ingen enheter dukker opp i HA | Sjekk at MQTT-integrasjonen er lagt til og at brukernavn/passord stemmer. Se appens **Logg** |
-| Får ikke kontakt med Home Manager | Sjekk IP-adressen og prøv å pinge den. Har Home Manager fått ny IP? |
-| Lys reagerer tregt eller ikke | Nettsiden → Hjem viser responstid. Gjentatte tidsavbrudd betyr ofte dårlig radiodekning til den dimmeren |
-| En knapp sender ikke noe | Er den lagt inn som **Generell inngang** i xSetup og lastet opp? Står den under «Knapper du nettopp har trykket på»? |
-| Knapp eller alarm virket før, men ikke etter en xSetup-opplasting | Verktøy → **Start søk**, og se Logg. Broen finner som regel igjen objektet selv |
-| Markisen står på feil prosent | Kjør den helt inn eller helt ut én gang. Sjekk kjøretiden i innstillingene |
-| Trenger mer detaljer | Sett **Loggnivå** til `debug`, gjenta problemet, og last ned loggen fra nettsiden |
+| Ingen enheter i Home Assistant | Er MQTT-integrasjonen lagt til, og stemmer brukernavn og passord? Se fanen **Logg**. Har du lagt til enheter under **Enheter**? |
+| Får ikke kontakt med Home Manager | Sjekk IP-adressen. Har Home Manager fått ny adresse? |
+| Søket finner ingen lys | Lys må finnes i xSetup (objektet `D_<navn>`). Se **Enheter → Finn et objekt** for hva Home Manager faktisk har. |
+| Lys reagerer tregt | Se responstid på **Hjem**. Lange tider betyr ofte dårlig radiodekning eller lang dimmetid i MRF. USB-pinnen hjelper. |
+| USB-pinnen blir ikke funnet | Sjekk at den sitter i Home Assistant-maskinen og at MRF ikke bruker den. Appen ser etter den hvert 10. sekund. |
+| «Fikk ikke svar» fra noen lys under læring | De er trolig utenfor rekkevidde for pinnen. De styres fortsatt via Home Manager. Flytt pinnen nærmere og prøv igjen. |
+| En knapp sender ikke noe | Er den **Generell inngang** i xSetup og lastet opp? Dukker den opp under **Knapper** når du trykker? |
+| Trenger mer detaljer | Sett **Loggnivå** til `debug`, gjenta problemet, last ned loggen fra nettsiden og legg den ved en issue. |
+
+---
+
+## Begrensninger
+
+Ærlig talt, dette gjenstår:
+
+- **Søket finner lys, brytere og knapper.** Markiser, termostater og sensorer støttes av appen, men kan
+  foreløpig ikke legges til fra nettsiden. Har du slike og vil hjelpe, opprett en issue med navnene fra
+  **Enheter → Finn et objekt**, så legger vi det til.
+- **Testet på ett anlegg** (Sensio X1 / Home Manager med tilleggskontroller). Andre oppsett skal virke,
+  men er ikke bekreftet ennå.
+- **USB-pinnen** er testet med CKOZ-00/13. Radioprotokollen er kartlagt ved å lytte på MRF.
+- Appen er ikke laget av eller støttet av Eaton.
 
 ---
 
 ## Sikkerhet
 
-- Protokollen mellom broen og Home Manager er **ukryptert** (slik Eaton har
-  laget den). Hold Home Manager på et lukket hjemmenett og **aldri** åpne port
-  10023 mot internett.
-- Bruk en egen MQTT-bruker til broen.
-- **Ikke legg private filer i dette repoet.** MRF-eksporter
-  (`Anlagenkonfiguration*.txt`) inneholder MRF-passordet i klartekst, og
-  innloggings- og anleggsfiler fra Eaton-skyen inneholder nøkler.
-  `.gitignore` stopper de vanligste, men sjekk alltid hva du laster opp.
+- Protokollen mot Home Manager er **ukryptert** (slik Eaton har laget den). Hold Home Manager på et lukket
+  hjemmenett og **aldri** åpne port 10023 mot internett.
+- Bruk en egen MQTT-bruker til appen.
+- Appen gjør ingenting med anlegget ditt før du har valgt enheter. Den kjenner igjen anlegget den ble laget
+  på ved å sjekke navnene i Home Manager, og bruker ellers bare det du legger til selv.
+- **Ikke last opp private filer.** MRF-eksporter (`Anlagenkonfiguration*.txt`) inneholder MRF-passordet i
+  klartekst. `.gitignore` stopper de vanligste, men sjekk alltid.
 
 ---
 
@@ -376,49 +356,59 @@ at enhetene oppdages automatisk), opprett gjerne en *issue*.
 ```
 xcomfort-ha/
 ├── repository.yaml                  App-repo for Home Assistant
+├── verktoy/lag_usb_kart.py          Lager USB-kart fra MRF-eksport + xSetup-backup (valgfritt)
 └── xcomfort_bridge/
-    ├── config.yaml                  Versjon, innstillinger, nettside (ingress)
-    ├── xcomfort_mqtt_bridge.py      Hovedprogrammet: MQTT, discovery, kommandoer
-    ├── xcomfort_local_control.py    Protokollen mot Home Manager + enhetslister
-    ├── hm_link.py                   Lytte-forbindelsen (hurtig status)
-    ├── idmap.py                     Følger objekter som får nytt nummer
-    ├── scanner.py                   Søk etter alle objekter i Home Manager
+    ├── config.yaml                  Versjon, innstillinger, nettside (ingress), USB
+    ├── xcomfort_mqtt_bridge.py      Hovedprogrammet: MQTT, discovery, kommandoer, USB-styring
+    ├── xcomfort_local_control.py    Protokollen mot Home Manager (+ enhetslisten for forfatterens anlegg)
+    ├── hm_link.py                   Lytte-forbindelsen (hurtig status og hurtigvei for kommandoer)
     ├── usbstick.py                  Direkte radio via USB-pinnen CKOZ-00/13
+    ├── scanner.py                   Søk etter alle objekter i Home Manager
+    ├── idmap.py                     Følger objekter som får nytt nummer
     ├── web.py, web/index.html       Nettsiden i sidepanelet
-    ├── seed_cache.json              Kjente objekt-numre for raskere første start
-    ├── translations/                Tekster til innstillingene
-    ├── tests/test_bro.py            Tester (med falsk Home Manager)
+    ├── tests/test_bro.py            Tester mot en falsk Home Manager og en falsk USB-pinne
     └── CHANGELOG.md
 ```
 
-### Protokollen i korte trekk
+### Home Manager-protokollen
 
-Ren tekst over TCP port 10023. Hver melding er pakket inn i `0x01` (start) og
-`0x02` (slutt):
+Ren tekst over TCP port 10023. Hver melding pakkes inn i `0x01` … `0x02`.
 
 | Retning | Melding | Betyr |
 |---|---|---|
-| → | `d_obj <id>` | Abonner på et objekt (Home Manager svarer med verdien og sender endringer) |
-| ← | `SSN <id> <navn> <type> ... <verdi>` | Verdi eller endring |
-| → | `set_value <id> <verdi>` | Sett en verdi (f.eks. lysstyrke 0-100) |
-| → | `new_state <id> <verdi>` | «Utfør» |
+| → | `d_obj <id>` | Abonner på et objekt. Home Manager svarer med verdien og sender senere endringer. |
+| ← | `SSN <id> <navn> <type> … <verdi>` | Verdi eller endring |
+| → | `set_value <id> <verdi>` | Sett en verdi, f.eks. lysstyrke 0 til 100 |
+| → | `new_state <id> 0` | Utfør |
 
-Home Manager sender svar og endringer til **alle** åpne forbindelser.
+Home Manager sender endringer til **alle** åpne forbindelser.
 
-### Kjøre testene på PC
+### USB-pinnen
 
-```
+HID-enhet `188A:1102`, rammer på 62 bytes: `5A <lengde> <kode> <data> A5`. Radiokommandoer har kode
+`1B` og adresseres direkte på dimmerens serienummer, med CRC-16/Kermit. `50` = på, `51` = av,
+`5A 01 00 <nivå 0-255>` = sett nivå. Dimmeren kvitterer til pinnens adresse (128). Detaljer i
+[`usbstick.py`](xcomfort_bridge/usbstick.py).
+
+### Hvilket anlegg?
+
+Ved første oppstart spør appen Home Manager om navnene på noen kjente objekter. Stemmer de med
+forfatterens anlegg, brukes den innebygde enhetslisten. Ellers starter appen tom. Valget lagres i
+`/data/anlegg.json` (`{"innebygd": false}`) og kan overstyres der.
+
+### Tester
+
+```bash
 cd xcomfort_bridge
-pip install paho-mqtt
+pip install paho-mqtt pyusb
 python -m unittest discover -s tests -v
 ```
 
-Testene kjører også automatisk på GitHub ved hver opplasting (fanen
-*Actions*). De bruker en falsk Home Manager, så du trenger ikke tilgang til
-et ekte anlegg.
+Testene kjører automatisk på GitHub ved hver opplasting. De trenger ikke et ekte anlegg.
 
 ---
 
-*Dette prosjektet er ikke laget av, støttet av eller knyttet til Eaton eller
-Sensio. xComfort og eoptHome er varemerker for sine respektive eiere. Bruk på
-eget ansvar.*
+<p align="center">
+  Laget i Norge for et hus med for mange lysbrytere. 💡<br>
+  <sub>Eaton, xComfort og Sensio er varemerker for sine respektive eiere. Dette prosjektet er uavhengig.</sub>
+</p>
