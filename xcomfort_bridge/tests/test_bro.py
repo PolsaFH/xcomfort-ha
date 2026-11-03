@@ -459,6 +459,168 @@ class TestSkanner(unittest.TestCase):
         self.assertEqual(scanner.pretty("DownlightKjellerstue"), "Downlight Kjellerstue")
 
 
+# Anonymisert utdrag av et ekte anlegg: samme typenumre, avstander og kuttede
+# navn som Home Manager faktisk sender, men med nøytrale navn.
+EKTE_OBJEKTER = {
+    # Dimmer, avstand +171/+219
+    1000: ("D_TaklampeKjokken", 21), 1171: ("M_D_TaklampeKjokken_Val", 23), 1219: ("B_D_TaklampeKjokken_SET", 6),
+    # Dimmer, avstand +118/+166
+    2000: ("D_DownlightHall", 21), 2118: ("M_D_DownlightHall_Val", 23), 2166: ("B_D_DownlightHall_SET", 6),
+    # Dimmer med langt navn: Home Manager kutter styre-objektene (29 tegn)
+    3000: ("D_TaklampeLysthusLysthusXY", 21), 3171: ("M_D_TaklampeLysthusLysthusX", 23),
+    3219: ("B_D_TaklampeLysthusLysthusX", 6), 3220: ("B_D_TaklampeLysthusLysthusX", 6),
+    # Markise: samme type som dimmer, men egne Open/Stop/Close/Up-objekter
+    4000: ("D_MarkiseTerrasseUte", 21), 4061: ("B_MarkiseTerrasse_Open", 6),
+    4126: ("B_MarkiseTerrasse_Stop", 6), 4191: ("B_MarkiseTerrasse_Close", 6), 4256: ("B_MarkiseTerrasse_Up", 6),
+    # Av/på: R_ med B_R_<navn>_ON/OFF på +209/+285
+    5000: ("R_SpeilBad", 8), 5209: ("B_R_SpeilBad_ON", 6), 5285: ("B_R_SpeilBad_OFF", 6),
+    # Av/på: R_ med kuttede navn
+    6000: ("R_GardsplasslyskasterUtelys", 8), 6209: ("B_R_GardsplasslyskasterUtely", 6),
+    6285: ("B_R_GardsplasslyskasterUtely", 6),
+    # Av/på: TS_<navn><sone> med B_<sone>_<navn>_On/Off på +71/+168
+    7000: ("TS_TerassevarmerUte", 8), 7071: ("B_Ute_Terassevarmer_On", 6), 7168: ("B_Ute_Terassevarmer_Off", 6),
+    # Internt relé uten av/på-objekter: skal IKKE foreslås
+    8000: ("R_DummyStue", 8),
+    # Termostat, inngang, sensorer
+    9000: ("TH_Stue037", 7), 9100: ("IN_BRStue", 11),
+    9200: ("TS_Solfler", 10), 9300: ("TS_Ute", 10), 9400: ("S_TaklampeStueTemp", 10),
+    # Støy: interne objekter som ikke er enheter
+    9500: ("TS_LightStue", 2), 9600: ("T_SafeCheck1", 4), 9700: ("D_SafeOffStue037", 13),
+}
+
+
+class TestSkannerEkteAnlegg(unittest.TestCase):
+    def test_finner_alle_typer_riktig(self):
+        import scanner
+        c = scanner.candidates(EKTE_OBJEKTER, known_ids=set())
+        lys = {x["id"]: (x["val_id"], x["set_id"]) for x in c["lys"]}
+        self.assertEqual(lys, {1000: (1171, 1219), 2000: (2118, 2166), 3000: (3171, 3219)})
+        self.assertEqual([(x["id"], x["open_id"], x["stop_id"], x["close_id"]) for x in c["markiser"]],
+                         [(4000, 4061, 4126, 4191)])
+        brytere = {x["id"]: (x["on_id"], x["off_id"]) for x in c["brytere"]}
+        self.assertEqual(brytere, {5000: (5209, 5285), 6000: (6209, 6285), 7000: (7071, 7168)})
+        self.assertEqual([(x["id"], x["navn"], x["sone"]) for x in c["termostater"]], [(9000, "Stue", "Stue")])
+        self.assertEqual({x["id"]: x["enhet"] for x in c["sensorer"]}, {9200: "lux", 9300: "°C", 9400: "°C"})
+        self.assertEqual([x["id"] for x in c["knapper"]], [9100])
+
+    def test_kjente_enheter_foreslas_ikke(self):
+        import scanner
+        c = scanner.candidates(EKTE_OBJEKTER, known_ids={1000, 4000, 9000})
+        self.assertNotIn(1000, [x["id"] for x in c["lys"]])
+        self.assertEqual(c["markiser"], [])
+        self.assertEqual(c["termostater"], [])
+
+    def test_markise_med_kuttede_navn_finnes_paa_avstand(self):
+        import scanner
+        objs = {10: ("D_MarkiseVeldigLangtNavnUte", 21), 71: ("B_MarkiseVeldigLangtNavnU", 6),
+                136: ("B_MarkiseVeldigLangtNavnU", 6), 201: ("B_MarkiseVeldigLangtNavnU", 6)}
+        c = scanner.candidates(objs, known_ids=set())
+        self.assertEqual([(x["open_id"], x["stop_id"], x["close_id"]) for x in c["markiser"]], [(71, 136, 201)])
+
+
+class TestNyeEnhetstyper(unittest.TestCase):
+    """Markiser, termostater, sensorer og av/på-sensorer lagt til fra nettsiden."""
+
+    def _bridge(self):
+        fake = FakeHM(ack_ids=())
+        bro, xc = load_bridge(fake)
+        bro.clear_builtin_devices()
+        bro.SCANNER.objects = dict(EKTE_OBJEKTER)
+        client = FakeClient()
+        bro.MQTT_STATE["client"] = client
+        return fake, bro, xc, client
+
+    def test_markise_legges_til_og_styres_med_riktige_objekter(self):
+        fake, bro, xc, client = self._bridge()
+        try:
+            api = bro.Api()
+            r = api.add_extra({"markiser": [{"id": 4000, "navn": "Terrasse", "sone": "Ute", "runtime": 22}]})
+            self.assertEqual(r["lagt_til"], ["Terrasse"])
+            self.assertEqual(xc.MARKISER, [("Ute", "Terrasse", 4000)])
+            m = bro.MARKISER_CTRL.markiser[4000]
+            self.assertEqual((m.runtime, m.button_id("inn"), m.button_id("stopp"), m.button_id("ut")),
+                             (22.0, 4061, 4126, 4191))
+            cfg = json.loads(client.last("homeassistant/cover/xcomfort_4000/config"))
+            self.assertEqual(cfg["device_class"], "awning")
+            # Motsatt retning og ny kjøretid fra blyanten på nettsiden
+            self.assertTrue(api.update_extra({"id": 4000, "runtime": 40, "reverse": True})["ok"])
+            m = bro.MARKISER_CTRL.markiser[4000]
+            self.assertEqual((m.runtime, m.button_id("ut"), m.button_id("inn")), (40.0, 4061, 4191))
+            dev = next(d for d in api.devices() if d["id"] == 4000)
+            self.assertEqual((dev["art"], dev["runtime"], dev["reverse"]), ("markiser", 40.0, True))
+            # Kommandoen går til riktig objekt
+            bro.MARKISER_CTRL._send(m, "stopp", "test")
+            self.assertIn("new_state 4126 0", [c for _, c in fake.commands("new_state")])
+            self.assertTrue(api.remove_extra({"id": 4000})["ok"])
+            self.assertEqual(client.last("homeassistant/cover/xcomfort_4000/config"), "")
+            self.assertNotIn(4000, bro.MARKISER_CTRL.markiser)
+        finally:
+            bro.MQTT_STATE["client"] = None
+            fake.close()
+
+    def test_termostat_sensor_og_av_paa_sensor(self):
+        fake, bro, xc, client = self._bridge()
+        try:
+            api = bro.Api()
+            r = api.add_extra({"termostater": [{"id": 9000, "navn": "Stue", "sone": "Stue"}],
+                               "sensorer": [{"id": 9200, "navn": "Sol", "sone": "Ute", "enhet": "lux"}],
+                               "knapper": [{"id": 9100, "navn": "Alarm", "sone": "Stue", "som": "sensor"}]})
+            self.assertEqual(sorted(r["lagt_til"]), ["Alarm", "Sol", "Stue"])
+            self.assertEqual(xc.THERMOSTATS, [("Stue", "Stue", 9000)])
+            self.assertIn(("Ute", "Sol", 9200, "lux"), bro.CONTINUOUS_SENSORS)
+            self.assertIn(("Stue", "Alarm", 9100, ""), bro.BINARY_SENSORS)
+            self.assertEqual(bro.BUTTONS, [])          # inngangen ble sensor, ikke knapp
+            self.assertTrue(client.last("homeassistant/climate/xcomfort_9000/config"))
+            sensor = json.loads(client.last("homeassistant/sensor/xcomfort_9200/config"))
+            self.assertEqual((sensor["device_class"], sensor["unit_of_measurement"]), ("illuminance", "lx"))
+            alarm = json.loads(client.last("homeassistant/binary_sensor/xcomfort_9100/config"))
+            self.assertNotIn("entity_category", alarm)
+            ids = bro.rebuild_registry()
+            self.assertTrue({9000, 9200} <= ids)
+            # Endre enhet, så fjerne
+            self.assertTrue(api.update_extra({"id": 9200, "enhet": "°C"})["ok"])
+            self.assertIn(("Ute", "Sol", 9200, "°C"), bro.CONTINUOUS_SENSORS)
+            api.update_extra({"id": 9200, "enhet": "parsec"})          # ugyldig enhet ignoreres
+            self.assertIn(("Ute", "Sol", 9200, "°C"), bro.CONTINUOUS_SENSORS)
+            for oid, topic in ((9000, "climate/xcomfort_9000"), (9200, "sensor/xcomfort_9200"),
+                               (9100, "binary_sensor/xcomfort_9100")):
+                self.assertTrue(api.remove_extra({"id": oid})["ok"])
+                self.assertEqual(client.last(f"homeassistant/{topic}/config"), "")
+            self.assertEqual((xc.THERMOSTATS, bro.BINARY_SENSORS), ([], []))
+        finally:
+            bro.MQTT_STATE["client"] = None
+            fake.close()
+
+    def test_lagt_til_foreslas_ikke_igjen_og_overlever_omstart(self):
+        fake, bro, xc, client = self._bridge()
+        try:
+            api = bro.Api()
+            api.add_extra({"markiser": [4000], "lys": [3000]})
+            cands = api.scan_info()["kandidater"]
+            self.assertEqual(cands["markiser"], [])
+            self.assertNotIn(3000, [x["id"] for x in cands["lys"]])
+            self.assertEqual(api.add_extra({"markiser": [4000]})["lagt_til"], [])   # ikke dobbelt
+            # «Omstart»: tøm listene og les fila på nytt
+            bro.clear_builtin_devices()
+            bro.load_extras()
+            self.assertEqual([x[2] for x in xc.MARKISER], [4000])
+            self.assertEqual(xc.load_cache()["3000"], {"name": "D_TaklampeLysthusLysthusXY",
+                                                       "val_id": 3171, "set_id": 3219})
+        finally:
+            bro.MQTT_STATE["client"] = None
+            fake.close()
+
+    def test_reset_knappen_bare_for_det_opprinnelige_anlegget(self):
+        fake, bro, xc, client = self._bridge()
+        try:
+            bro.Api().add_extra({"markiser": [4000]})
+            bro.publish_button_discovery(client)
+            self.assertIsNone(client.last("homeassistant/button/xcomfort_balkong_reset/config"))
+        finally:
+            bro.MQTT_STATE["client"] = None
+            fake.close()
+
+
 class TestSkannerFortsetter(unittest.TestCase):
     def test_finner_objekter_forbi_max_id(self):
         """Nye objekter fra MRF ligger over max_id -- skal likevel bli funnet."""

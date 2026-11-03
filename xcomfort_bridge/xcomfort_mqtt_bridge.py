@@ -47,7 +47,7 @@ import usbstick
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "3.0.0"
+BRIDGE_VERSION = "3.1.0"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -483,7 +483,8 @@ def publish_switch_discovery(client):
 
 
 def publish_sensor_discovery(client):
-    device_classes = {"°C": "temperature", "lux": "illuminance", "m/s": "wind_speed", "s": "duration"}
+    device_classes = {"°C": "temperature", "lux": "illuminance", "m/s": "wind_speed", "s": "duration",
+                      "%": "humidity"}
     ha_unit_overrides = {"lux": "lx"}  # HA godtar bare "lx" for illuminance
     diagnostic_names = {"retur", "tur", "kjøretid paviljon", "kjøretid balkong", "kjøretid boblebad"}
     for zone, name, smux_id, unit in CONTINUOUS_SENSORS:
@@ -511,9 +512,10 @@ def publish_binary_sensor_discovery(client):
             "state_topic": binary_sensor_state_topic(smux_id),
             "payload_on": "ON",
             "payload_off": "OFF",
-            "entity_category": "diagnostic",
             "device": device_block(zone),
         }
+        if smux_id not in EXTRA_IDS:
+            payload["entity_category"] = "diagnostic"
         if name.lower() in problem_names:
             payload["device_class"] = "problem"
         _pub_disc(client, "binary_sensor", f"xcomfort_{smux_id}", payload)
@@ -575,8 +577,9 @@ def publish_climate_discovery(client):
 
 
 def publish_button_discovery(client):
-    # Selve resett-logikken ligger i et HA-script; dette er bare knappen.
-    if not xc.MARKISER:
+    # Selve resett-logikken ligger i et HA-script i forfatterens anlegg; dette
+    # er bare knappen. Andre anlegg får den ikke.
+    if not (xc.MARKISER and PROFILE["innebygd"]):
         return
     _pub_disc(client, "button", f"xcomfort_{BALKONG_RESET_BUTTON_ID}", {
         "name": "Reset awnings",
@@ -1258,10 +1261,16 @@ POSITION_FILE = "/data/markise_posisjon.json" if os.path.isdir("/data") else \
 
 
 class Markise:
-    def __init__(self, smux_id, name, runtime):
+    def __init__(self, smux_id, name, runtime, buttons=None, reverse=False):
         self.smux_id = smux_id
         self.name = name
         self.runtime = max(1.0, float(runtime))
+        # Objektene som «trykkes» for inn/stopp/ut. Innebygde markiser bruker de
+        # faste avstandene (xc.MARKISE_OFFSETS); markiser lagt til fra nettsiden
+        # har objektene søket fant.
+        self.buttons = dict(buttons) if buttons else \
+            {a: xc.markise_button_id(smux_id, a) for a in ("inn", "stopp", "ut")}
+        self.reverse = bool(reverse)   # motoren er koblet motsatt vei
         self.position = 0.0
         self.moving = None       # None, "ut" eller "inn"
         self.t0 = 0.0
@@ -1290,6 +1299,11 @@ class Markise:
         self.settle(now)
         self.moving = None
         self.stop_at = None
+
+    def button_id(self, action):
+        if self.reverse and action in ("inn", "ut"):
+            action = "ut" if action == "inn" else "inn"
+        return self.buttons[action]
 
     def ha_state(self):
         if self.moving == "ut":
@@ -1350,20 +1364,45 @@ class MarkiseController:
         return self.q.qsize() + len(self.scheduled)
 
     # -- posisjon lagres saa den overlever restart --
-    def _load_positions(self):
+    def _saved_positions(self):
         try:
             with open(POSITION_FILE, encoding="utf-8") as f:
-                data = json.load(f)
-            for sid, m in self.markiser.items():
-                if str(sid) in data:
-                    m.position = float(data[str(sid)])
-            mlog.info("Loaded saved awning positions: %s",
-                      {m.name: round(m.position) for m in self.markiser.values()})
+                return json.load(f)
         except FileNotFoundError:
-            mlog.info("No saved awning positions -- assuming all are fully retracted (0 %). "
-                      "Run 'Reset awnings' to calibrate.")
+            return {}
         except Exception as e:  # noqa: BLE001
             mlog.warning("Could not read awning positions: %s", e)
+            return {}
+
+    def _load_positions(self):
+        data = self._saved_positions()
+        for sid, m in self.markiser.items():
+            if str(sid) in data:
+                m.position = float(data[str(sid)])
+        if not self.markiser:
+            return
+        if data:
+            mlog.info("Loaded saved awning positions: %s",
+                      {m.name: round(m.position) for m in self.markiser.values()})
+        else:
+            mlog.info("No saved awning positions -- assuming all are fully retracted (0 %). "
+                      "Run each awning fully in once to calibrate.")
+
+    def add(self, smux_id, name, runtime, buttons=None, reverse=False):
+        """Legger til (eller oppdaterer) en markise lagt til fra nettsiden."""
+        m = self.markiser.get(smux_id)
+        if m is None:
+            m = Markise(smux_id, name, runtime, buttons, reverse)
+            saved = self._saved_positions()
+            if str(smux_id) in saved:
+                m.position = float(saved[str(smux_id)])
+            self.markiser[smux_id] = m
+        else:
+            m.name, m.runtime = name, max(1.0, float(runtime))
+            m.buttons = dict(buttons) if buttons else m.buttons
+            m.reverse = bool(reverse)
+        STATS.markise.setdefault(smux_id, {"sendt": 0, "feilet": 0, "siste": "none"})
+        return m
 
     def _save_positions(self):
         try:
@@ -1396,8 +1435,8 @@ class MarkiseController:
         wait = self.last_tx + gap - time.time()
         if wait > 0:
             time.sleep(wait)
-        oid = xc.markise_button_id(m.smux_id, action)
-        stats = STATS.markise[m.smux_id]
+        oid = m.button_id(action)
+        stats = STATS.markise.setdefault(m.smux_id, {"sendt": 0, "feilet": 0, "siste": "none"})
         t_sent = None
         reply = ""
         error = None
@@ -1917,10 +1956,21 @@ def publish_onoff_light_discovery(client):
         })
 
 
+# Hvilke typer enheter som kan legges til fra nettsiden, og hva de heter i
+# ekstra_enheter.json. «alarmer» er innganger (IN_) brukt som av/på-sensorer.
+EXTRA_KINDS = ("lys", "brytere", "knapper", "markiser", "termostater", "sensorer", "alarmer")
+EXTRA_IDS = set()          # id-er for alt som er lagt til fra nettsiden
+DEFAULT_ROOM = "New devices"
+DEFAULT_AWNING_RUNTIME = 30.0
+SENSOR_UNITS = ("°C", "lux", "m/s", "%", "W", "kWh", "s", "")
+EXTRA_LABELS = {"lys": "lights", "brytere": "switches", "knapper": "buttons", "markiser": "awnings",
+                "termostater": "thermostats", "sensorer": "sensors", "alarmer": "on/off sensors"}
+
+
 def load_extras():
-    """Enheter som er lagt til fra nettsiden (Verktoey -> Soek etter nye
-    enheter). Legges til listene foer discovery, med samme unique_id-moenster
-    som de faste enhetene."""
+    """Enheter som er lagt til fra nettsiden (Devices -> Search). Legges til
+    listene foer discovery, med samme unique_id-moenster som de faste
+    enhetene. Kan kalles flere ganger: det som allerede er lagt inn hoppes over."""
     try:
         with open(EXTRA_FILE, encoding="utf-8") as f:
             extra = json.load(f)
@@ -1930,31 +1980,54 @@ def load_extras():
         log.warning("Could not read %s: %s", EXTRA_FILE, e)
         return
     cache = xc.load_cache()
-    known = {s for _, _, s in xc.LIGHTS} | {s for _, _, s in xc.SWITCHES} | {b[2] for b in BUTTONS}
+    known = ({s for _, _, s in xc.LIGHTS} | {s for _, _, s in xc.SWITCHES} | {b[2] for b in BUTTONS}
+             | {s for _, _, s in xc.MARKISER} | {s for _, _, s in xc.THERMOSTATS}
+             | {s[2] for s in CONTINUOUS_SENSORS} | {s[2] for s in BINARY_SENSORS})
     changed = False
-    for item in extra.get("lys", []):
-        if item["id"] in known:
-            continue
-        xc.LIGHTS.append((item.get("sone", "New devices"), item["navn"], item["id"]))
-        if item.get("val_id") and item.get("set_id") and str(item["id"]) not in cache:
-            cache[str(item["id"])] = {"name": item.get("objekt"), "val_id": item["val_id"], "set_id": item["set_id"]}
-            changed = True
-    for item in extra.get("brytere", []):
-        if item["id"] in known:
-            continue
-        xc.SWITCHES.append((item.get("sone", "New devices"), item["navn"], item["id"]))
-        if item.get("on_id") and item.get("off_id") and str(item["id"]) not in cache:
-            cache[str(item["id"])] = {"name": item.get("objekt"), "on_id": item["on_id"], "off_id": item["off_id"]}
-            changed = True
-    for item in extra.get("knapper", []):
-        if item["id"] in known:
-            continue
-        BUTTONS.append((item.get("sone", "Knapper"), item["navn"], item["id"]))
-        IDMAP.expect(item["id"], item.get("objekt"))
+    counts = {}
+    for kind in EXTRA_KINDS:
+        for item in extra.get(kind, []):
+            oid = int(item["id"])
+            EXTRA_IDS.add(oid)
+            counts[kind] = counts.get(kind, 0) + 1
+            if oid in known:
+                continue
+            room = item.get("sone") or (DEFAULT_ROOM if kind != "knapper" else "Knapper")
+            name = item["navn"]
+            if kind == "lys":
+                xc.LIGHTS.append((room, name, oid))
+                if item.get("val_id") and item.get("set_id") and str(oid) not in cache:
+                    cache[str(oid)] = {"name": item.get("objekt"), "val_id": item["val_id"], "set_id": item["set_id"]}
+                    changed = True
+            elif kind == "brytere":
+                xc.SWITCHES.append((room, name, oid))
+                if item.get("on_id") and item.get("off_id") and str(oid) not in cache:
+                    cache[str(oid)] = {"name": item.get("objekt"), "on_id": item["on_id"], "off_id": item["off_id"]}
+                    changed = True
+            elif kind == "knapper":
+                BUTTONS.append((room, name, oid))
+                IDMAP.expect(oid, item.get("objekt"))
+            elif kind == "markiser":
+                xc.MARKISER.append((room, name, oid))
+                buttons = None
+                if item.get("open_id") and item.get("stop_id") and item.get("close_id"):
+                    # Samme betydning som de innebygde: Open = inn, Close = ut.
+                    buttons = {"inn": item["open_id"], "stopp": item["stop_id"], "ut": item["close_id"]}
+                MARKISER_CTRL.add(oid, name, item.get("runtime") or DEFAULT_AWNING_RUNTIME,
+                                  buttons, item.get("reverse", False))
+            elif kind == "termostater":
+                xc.THERMOSTATS.append((room, name, oid))
+            elif kind == "sensorer":
+                CONTINUOUS_SENSORS.append((room, name, oid, item.get("enhet", "")))
+            elif kind == "alarmer":
+                BINARY_SENSORS.append((room, name, oid, ""))
+                BINARY_NAMES[oid] = f"{room} {name}"
+                IDMAP.expect(oid, item.get("objekt"))
     if changed:
         xc.save_cache(cache)
-    log.info("Devices added from the web page: %d lights, %d switches, %d buttons",
-             len(extra.get("lys", [])), len(extra.get("brytere", [])), len(extra.get("knapper", [])))
+    if counts:
+        log.info("Devices added from the web page: %s",
+                 ", ".join(f"{n} {EXTRA_LABELS[k]}" for k, n in counts.items()))
 
 
 # ------------------------------------------------------------ anlegg --
@@ -2285,7 +2358,8 @@ class Api:
         with _state_cache_lock:
             cache = dict(_state_cache)
         extra = self._read_extra()
-        extra_ids = {int(x["id"]) for k in ("lys", "brytere", "knapper") for x in extra.get(k, [])}
+        extra_items = {int(x["id"]): (k, x) for k in EXTRA_KINDS for x in extra.get(k, [])}
+        extra_ids = set(extra_items)
         out = []
         for zone, name, smux in xc.LIGHTS:
             st = json.loads(cache.get(light_state_topic(smux), "{}") or "{}")
@@ -2314,8 +2388,24 @@ class Api:
                         "ekstra": oid in extra_ids,
                         "siste": last[0] if last else None, "sek_siden": round(time.time() - last[1]) if last else None,
                         "tilstand": last[0].replace("_", " ") if last else "no presses yet"})
+        for zone, name, smux, unit in CONTINUOUS_SENSORS:
+            v = cache.get(sensor_state_topic(smux))
+            out.append({"type": "sensor", "id": smux, "sone": zone, "navn": name, "på": False,
+                        "enhet": unit, "tilstand": f"{v} {unit}".strip() if v is not None else "?"})
+        for zone, name, key, _unit in BINARY_SENSORS:
+            v = cache.get(binary_sensor_state_topic(key))
+            out.append({"type": "alarm", "id": key, "sone": zone, "navn": name, "på": v == "ON",
+                        "tilstand": {"ON": "active", "OFF": "normal"}.get(v, "?")})
         for d in out:
             d.setdefault("ekstra", d["id"] in extra_ids)
+            if d["ekstra"]:
+                kind, item = extra_items[d["id"]]
+                d["art"] = kind
+                if kind == "markiser":
+                    d["runtime"] = item.get("runtime", DEFAULT_AWNING_RUNTIME)
+                    d["reverse"] = bool(item.get("reverse"))
+                if kind == "sensorer":
+                    d["enhet"] = item.get("enhet", "")
         return out
 
     def usb(self):
@@ -2374,11 +2464,19 @@ class Api:
         os.replace(tmp, EXTRA_FILE)
 
     @staticmethod
-    def _drop_from_lists(oid):
+    def _drop_from_lists(oid, forget_awning=False):
         """Fjerner en enhet lagt til fra nettsiden fra listene i minnet."""
         xc.LIGHTS[:] = [x for x in xc.LIGHTS if x[2] != oid]
         xc.SWITCHES[:] = [x for x in xc.SWITCHES if x[2] != oid]
+        xc.MARKISER[:] = [x for x in xc.MARKISER if x[2] != oid]
+        xc.THERMOSTATS[:] = [x for x in xc.THERMOSTATS if x[2] != oid]
         BUTTONS[:] = [x for x in BUTTONS if x[2] != oid]
+        CONTINUOUS_SENSORS[:] = [x for x in CONTINUOUS_SENSORS if x[2] != oid]
+        BINARY_SENSORS[:] = [x for x in BINARY_SENSORS if x[2] != oid]
+        BINARY_NAMES.pop(oid, None)
+        if forget_awning:
+            MARKISER_CTRL.markiser.pop(oid, None)
+            STATS.markise.pop(oid, None)
 
     def _refresh(self):
         ids = rebuild_registry()
@@ -2388,49 +2486,67 @@ class Api:
         if client:
             publish_discovery(client)
 
+    def _find_extra(self, extra, oid):
+        for kind in EXTRA_KINDS:
+            for item in extra.get(kind, []):
+                if int(item["id"]) == oid:
+                    return kind, item
+        return None, None
+
+    # Discovery-emner som må tømmes når en enhet fjernes, så den forsvinner fra HA.
+    REMOVE_TOPICS = {
+        "lys": ["light/xcomfort_{id}"],
+        "brytere": ["switch/xcomfort_{id}", "light/xcomfort_onoff_{id}"],
+        "knapper": ["event/xcomfort_in_{id}"],
+        "markiser": ["cover/xcomfort_{id}", "sensor/xcomfort_diag_markise_{id}_sendt",
+                     "sensor/xcomfort_diag_markise_{id}_feilet", "sensor/xcomfort_diag_markise_{id}_siste"],
+        "termostater": ["climate/xcomfort_{id}", "sensor/xcomfort_valve_{id}"],
+        "sensorer": ["sensor/xcomfort_{id}"],
+        "alarmer": ["binary_sensor/xcomfort_{id}"],
+    }
+
     def remove_extra(self, body):
         """Fjerner en enhet som er lagt til fra nettsiden (ikke de faste)."""
         oid = int(body.get("id"))
         extra = self._read_extra()
-        kind = next((k for k in ("lys", "brytere", "knapper")
-                     if any(int(x["id"]) == oid for x in extra.get(k, []))), None)
+        kind, _item = self._find_extra(extra, oid)
         if kind is None:
             return {"ok": False, "feil": "device not found among those added from the web page"}
         extra[kind] = [x for x in extra[kind] if int(x["id"]) != oid]
         self._write_extra(extra)
-        self._drop_from_lists(oid)
-        if kind == "knapper":
+        self._drop_from_lists(oid, forget_awning=True)
+        EXTRA_IDS.discard(oid)
+        if kind in ("knapper", "alarmer"):
             IDMAP.expected.pop(oid, None)
         rebuild_registry()
         client = MQTT_STATE["client"]
         if client:
-            topic = {"lys": f"light/xcomfort_{oid}", "brytere": f"switch/xcomfort_{oid}",
-                     "knapper": f"event/xcomfort_in_{oid}"}[kind]
-            client.publish(f"{DISCOVERY_PREFIX}/{topic}/config", "", qos=1, retain=True)
-            if kind == "brytere":
-                client.publish(f"{DISCOVERY_PREFIX}/light/xcomfort_onoff_{oid}/config", "", qos=1, retain=True)
+            for t in self.REMOVE_TOPICS[kind]:
+                client.publish(f"{DISCOVERY_PREFIX}/{t.format(id=oid)}/config", "", qos=1, retain=True)
         log.info("Removed %s from HA (from the web page)", oid)
         return {"ok": True}
 
     def update_extra(self, body):
-        """Gir en enhet lagt til fra nettsiden nytt navn og/eller rom."""
+        """Endrer en enhet lagt til fra nettsiden: navn, rom, og for markiser
+        kjøretid og retning, for sensorer enhet."""
         oid = int(body.get("id"))
         extra = self._read_extra()
-        for kind in ("lys", "brytere", "knapper"):
-            for item in extra.get(kind, []):
-                if int(item["id"]) != oid:
-                    continue
-                if str(body.get("navn") or "").strip():
-                    item["navn"] = str(body["navn"]).strip()[:60]
-                if str(body.get("sone") or "").strip():
-                    item["sone"] = str(body["sone"]).strip()[:40]
-                self._write_extra(extra)
-                self._drop_from_lists(oid)
-                load_extras()
-                self._refresh()
-                log.info("Changed %s: %s in %s", oid, item["navn"], item.get("sone", "-"))
-                return {"ok": True}
-        return {"ok": False, "feil": "device not found among those added from the web page"}
+        kind, item = self._find_extra(extra, oid)
+        if kind is None:
+            return {"ok": False, "feil": "device not found among those added from the web page"}
+        want = dict(body)
+        if kind != "markiser":
+            want.pop("runtime", None)
+            want.pop("reverse", None)
+        if kind != "sensorer":
+            want.pop("enhet", None)
+        self._clean(item, want)
+        self._write_extra(extra)
+        self._drop_from_lists(oid)
+        load_extras()
+        self._refresh()
+        log.info("Changed %s: %s in %s", oid, item["navn"], item.get("sone", "-"))
+        return {"ok": True}
 
     def command(self, body):
         kind, smux, value = body.get("type"), int(body.get("id")), str(body.get("value"))
@@ -2452,73 +2568,72 @@ class Api:
     def scan_start(self):
         return {"ok": SCANNER.start()}
 
+    def _known(self):
+        """Alt broen allerede bruker: skal ikke foreslås som nytt."""
+        return (REG["light_ids"] | REG["switch_ids"] | REG["binary_ids"] | REG["sensor_ids"]
+                | REG["thermo_ids"] | set(REG["button_ids"]) | REG["markise_ids"] | set(REG["val_to_light"])
+                | set(REG["alias"]) | EXTRA_IDS)
+
     def scan_info(self):
-        known = REG["light_ids"] | REG["switch_ids"] | REG["binary_ids"] | REG["sensor_ids"] | \
-            REG["thermo_ids"] | set(REG["button_ids"]) | REG["markise_ids"]
-        cands = scanner.candidates(SCANNER.objects, known)
-        try:
-            with open(EXTRA_FILE, encoding="utf-8") as f:
-                extra = json.load(f)
-        except Exception:  # noqa: BLE001
-            extra = {}
-        for kind in cands:
-            added = {x["id"] for x in extra.get(kind, [])}
-            for item in cands[kind]:
-                item["lagt_til"] = item["id"] in added
+        cands = scanner.candidates(SCANNER.objects, self._known())
         now = time.time()
         nylig = [{"id": oid, "objekt": name, "navn": scanner.pretty(name.split("_", 1)[-1]),
                   "sek_siden": round(now - t)}
                  for oid, (name, t) in sorted(RECENT_UNKNOWN.items(), key=lambda x: -x[1][1])
-                 if oid not in REG["alias"] and now - t < 24 * 3600]
-        return {"status": SCANNER.status(), "kandidater": cands, "nylig": nylig}
-
-    def _known(self):
-        return (REG["light_ids"] | REG["switch_ids"] | REG["binary_ids"] | REG["sensor_ids"]
-                | REG["thermo_ids"] | set(REG["button_ids"]) | REG["markise_ids"] | set(REG["val_to_light"]))
+                 if oid not in REG["alias"] and oid not in EXTRA_IDS and now - t < 24 * 3600]
+        return {"status": SCANNER.status(), "kandidater": cands, "nylig": nylig, "enheter": list(SENSOR_UNITS)}
 
     def scan_all(self):
         known = self._known()
         return [{"id": oid, "navn": name, "type": typ, "kjent": oid in known}
                 for oid, (name, typ) in sorted(SCANNER.objects.items())]
 
+    @staticmethod
+    def _clean(item, want):
+        """Felles felt fra nettsiden: navn, rom, kjøretid, enhet, retning."""
+        if str(want.get("navn") or "").strip():
+            item["navn"] = str(want["navn"]).strip()[:60]
+        if str(want.get("sone") or "").strip():
+            item["sone"] = str(want["sone"]).strip()[:40]
+        if "runtime" in want and want["runtime"] not in (None, ""):
+            item["runtime"] = max(1.0, min(300.0, float(want["runtime"])))
+        if "reverse" in want:
+            item["reverse"] = bool(want["reverse"])
+        if "enhet" in want and want["enhet"] in SENSOR_UNITS:
+            item["enhet"] = want["enhet"]
+        return item
+
     def add_extra(self, body):
-        try:
-            with open(EXTRA_FILE, encoding="utf-8") as f:
-                extra = json.load(f)
-        except Exception:  # noqa: BLE001
-            extra = {}
-        known = REG["light_ids"] | REG["switch_ids"] | REG["binary_ids"] | REG["sensor_ids"] | \
-            REG["thermo_ids"] | set(REG["button_ids"]) | REG["markise_ids"]
-        cands = scanner.candidates(SCANNER.objects, known)
+        extra = self._read_extra()
+        cands = scanner.candidates(SCANNER.objects, self._known())
         added = []
-        for kind in ("lys", "brytere", "knapper"):
+        for kind in ("lys", "brytere", "knapper", "markiser", "termostater", "sensorer"):
             for entry in body.get(kind, []):
                 want = entry if isinstance(entry, dict) else {"id": entry}
                 oid = int(want["id"])
                 item = next((dict(c) for c in cands[kind] if c["id"] == oid), None)
-                if item is None and kind == "knapper" and \
-                        (int(oid) in SCANNER.objects or int(oid) in RECENT_UNKNOWN):
+                if item is None and kind == "knapper" and (oid in SCANNER.objects or oid in RECENT_UNKNOWN):
                     # Hvilket som helst objekt kan foelges som knapp/hendelse
-                    name = (SCANNER.objects.get(int(oid)) or RECENT_UNKNOWN[int(oid)])[0]
-                    item = {"id": int(oid), "navn": scanner.pretty(name.split("_", 1)[-1]), "objekt": name}
-                if item:
-                    if str(want.get("navn") or "").strip():
-                        item["navn"] = str(want["navn"]).strip()[:60]
-                    if str(want.get("sone") or "").strip():
-                        item["sone"] = str(want["sone"]).strip()[:40]
-                if item and not any(x["id"] == item["id"] for x in extra.get(kind, [])):
-                    extra.setdefault(kind, []).append(item)
-                    added.append(item["navn"])
-        with open(EXTRA_FILE, "w", encoding="utf-8") as f:
-            json.dump(extra, f, indent=2, ensure_ascii=False)
+                    name = (SCANNER.objects.get(oid) or RECENT_UNKNOWN[oid])[0]
+                    item = {"id": oid, "navn": scanner.pretty(name.split("_", 1)[-1]), "objekt": name}
+                if item is None:
+                    continue
+                item.pop("lagt_til", None)
+                self._clean(item, want)
+                target = kind
+                if kind == "knapper" and want.get("som") == "sensor":
+                    target = "alarmer"     # inngang som av/på-sensor i stedet for knapp
+                if kind == "markiser":
+                    item.setdefault("runtime", DEFAULT_AWNING_RUNTIME)
+                    item.setdefault("reverse", False)
+                if any(int(x["id"]) == oid for k in EXTRA_KINDS for x in extra.get(k, [])):
+                    continue
+                extra.setdefault(target, []).append(item)
+                added.append(item["navn"])
         if added:
+            self._write_extra(extra)
             load_extras()
-            ids = rebuild_registry()
-            if LINK:
-                LINK.subscribe(ids)
-            client = MQTT_STATE["client"]
-            if client:
-                publish_discovery(client)
+            self._refresh()
             log.info("Added from the web page: %s", ", ".join(added))
         return {"ok": True, "lagt_til": added}
 

@@ -75,6 +75,8 @@ andre integrasjoner for dem.
 |---|---|
 | 💡 **Lys med lysstyrke** | Dimmere blir `light` i Home Assistant. Endringer fra veggbryteren vises på under ett sekund. |
 | 🔌 **Av/på-brytere** | Terrassevarmere, vifter, lyskastere og andre aktuatorer blir `switch`. |
+| ☀️ **Markiser** | Ut, inn og stopp, med posisjonen beregnet fra kjøretiden du setter. |
+| 🌡️ **Termostater og sensorer** | Romtemperatur og ønsket temperatur som `climate`. Temperatur, lys, vind og andre verdier som sensorer. Innganger som dørkontakter kan bli av/på-sensorer. |
 | 🔘 **Veggknapper som smarte knapper** | Kort trykk, langt trykk og slipp blir hendelser. Bruk dem til musikk, scener eller hva som helst. |
 | 📡 **USB-pinne (valgfritt)** | Lysene styres direkte over radio og reagerer med en gang. Home Manager tar over hvis en dimmer ikke svarer. |
 | 🧠 **Lærer selv** | Finner enhetene i Home Manager, og finner hvilke dimmere hvert lys styrer. Ingen nummer å skrive inn. |
@@ -130,7 +132,8 @@ Under fanen **Info**: slå på **Start ved oppstart**, **Watchdog** og **Vis i s
 <p align="center"><img src="images/devices.png" alt="Legg til enheter" width="820"></p>
 
 1. Trykk **Start search**. Appen går gjennom alt Home Manager har (10 til 20 minutter, påvirker ikke radioen).
-2. Gi lys, brytere og knapper et navn og et rom.
+2. Gi hver enhet et navn og et rom. Lys, brytere, markiser, termostater, sensorer og knapper står hver for seg.
+   For markiser setter du også kjøretiden, og for sensorer enheten.
 3. Trykk **Add selected to Home Assistant**.
 
 Ferdig. Enhetene ligger nå under *Innstillinger → Enheter og tjenester → MQTT*, sortert per rom, og du kan
@@ -143,7 +146,7 @@ bruke dem som alt annet i Home Assistant.
 | Fane | Hva du finner |
 |---|---|
 | **Home** | «Everything is working», eller nøyaktig hva som er galt. Nøkkeltall, markiser og en levende liste over alt som skjer i huset. |
-| **Rooms** | Alle enheter per rom. Trykk for av/på, dra for å dimme, «Turn all off» per rom. Blyanten endrer navn og rom. |
+| **Rooms** | Alle enheter per rom, med filter for lys, brytere, markiser, varme og sensorer. Trykk for av/på, dra for å dimme, «Turn all off» per rom. Blyanten endrer navn og rom, og for markiser kjøretid og retning. |
 | **Buttons** | Alle veggknapper med siste trykk. Trykker du på en ny knapp i huset, dukker den opp her og kan legges til med ett trykk. |
 | **Devices** | Søk i Home Manager, legg til nye enheter, finn objekter og last ned sikkerhetskopi. |
 | **USB stick** | Status for pinnen, automatisk læring av hvilke dimmere hvert lys styrer, og feilsøking. |
@@ -241,7 +244,7 @@ mode: single
 | Hurtig status (`instant_status`) | på | Holder en forbindelse åpen og får endringer på under ett sekund. Kreves for knapper. |
 | Avlesningsintervall | `20` sek | Hvor ofte alt leses av når hurtig status er av. |
 | Loggnivå | `info` | `debug` logger all trafikk til og fra Home Manager. |
-| Markise-innstillinger | | Kjøretid, pauser og dobbel stopp. Se [Begrensninger](#begrensninger). |
+| Markise-innstillinger | | Posisjon, pauser og dobbel stopp for alle markiser. Markiser du legger til får kjøretiden sin på nettsiden. |
 
 ---
 
@@ -301,6 +304,8 @@ Kjør gjerne **Devices → Search again** etterpå, og last ned en ny sikkerhets
 | Lys reagerer tregt | Se responstid på **Home**. Lange tider betyr ofte dårlig radiodekning eller lang dimmetid i MRF. USB-pinnen hjelper. |
 | USB-pinnen blir ikke funnet | Sjekk at den sitter i Home Assistant-maskinen og at MRF ikke bruker den. Appen ser etter den hvert 10. sekund. |
 | «No answer» fra noen lys under læring | De er trolig utenfor rekkevidde for pinnen. De styres fortsatt via Home Manager. Flytt pinnen nærmere og prøv igjen. |
+| En markise går feil vei, eller posisjonen stemmer ikke | Trykk på blyanten på markisen under **Rooms**. Kryss av for **Swap directions**, eller juster kjøretiden (sekunder fra helt inne til helt ute). |
+| En sensor har feil enhet | Trykk på blyanten på sensoren under **Rooms** og velg riktig enhet. |
 | En knapp sender ikke noe | Er den **Generell inngang** i xSetup og lastet opp? Dukker den opp under **Buttons** når du trykker? |
 | Trenger mer detaljer | Sett **Loggnivå** til `debug`, gjenta problemet, last ned loggen fra nettsiden og legg den ved en issue. |
 
@@ -310,9 +315,13 @@ Kjør gjerne **Devices → Search again** etterpå, og last ned en ny sikkerhets
 
 Ærlig talt, dette gjenstår:
 
-- **Søket finner lys, brytere og knapper.** Markiser, termostater og sensorer støttes av appen, men kan foreløpig
-  ikke legges til fra nettsiden. Har du slike og vil hjelpe, opprett en issue med navnene fra
-  **Devices → Find an object**, så legger vi det til.
+- **Markise-posisjonen er beregnet** ut fra kjøretiden, siden markisene ikke sier fra hvor de er. Kjør hver
+  markise helt inn én gang etter at du har lagt den til, så vet appen hvor den starter.
+- **Lysscener** som er lagret i Home Manager er ikke med ennå. Veggknapper og scener i Home Assistant virker fint
+  i mellomtiden.
+- **Søket kjenner igjen enheter på navnene xSetup gir dem** (`D_`, `R_`, `TH_`, `TS_`, `IN_` og så videre). Mangler
+  noe? Finn det under **Devices → Find an object** (innganger kan legges til direkte der), eller opprett en issue
+  med navnene du ser der.
 - **Testet på ett anlegg** (Sensio X1 / Home Manager med tilleggskontroller). Andre oppsett skal virke, men er
   ikke bekreftet ennå.
 - **USB-pinnen** er testet med CKOZ-00/13, og bruker de samme kommandoene som MRF bruker når du tester et lys.

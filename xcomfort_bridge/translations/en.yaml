@@ -33,10 +33,10 @@ configuration:
     description: Also creates a light entity for the on/off switches that are lights (for example ceiling lights), so they show up under Lights in Home Assistant and Google Home. The switch entities are kept.
   awning_position:
     name: Awning position (time based)
-    description: Calculates an approximate position (0-100 %) from the running time, and lets Home Assistant set a position directly. The awning settings currently apply to awnings built into the code only.
+    description: Calculates an approximate position (0-100 %) from the running time, and lets Home Assistant set a position directly. Applies to all awnings. Awnings you add on the web page get their running time there.
   awning_runtime_balcony:
     name: Running time, balcony awning (seconds)
-    description: Time from fully retracted to fully extended.
+    description: Time from fully retracted to fully extended. The three running times are for the awnings built into the code. Awnings you add on the web page get their running time there.
   awning_runtime_pavilion:
     name: Running time, pavilion awning (seconds)
   awning_runtime_hot_tub:

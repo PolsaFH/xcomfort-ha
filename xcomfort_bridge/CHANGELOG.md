@@ -2,6 +2,27 @@
 
 From 3.0.0 the changelog is written in English. Older entries are in Norwegian.
 
+## 3.1.0 (2026-11-03)
+
+Awnings, thermostats and sensors can now be found and added from the web page, on any installation.
+
+### New
+- **The search finds awnings, thermostats and sensors**, in addition to lights, switches and buttons. Add them
+  under **Devices** like everything else.
+  - **Awnings:** set the running time (seconds from fully in to fully out) when adding. The pencil under
+    **Rooms** changes it later, and can swap the directions if extend and retract are the wrong way round.
+  - **Thermostats** get the room from the Home Manager name.
+  - **Sensors:** the unit (°C, lux, m/s, % and so on) is guessed from the name and can be changed.
+- **Inputs can be added as on/off sensors** instead of buttons, for example a door contact or a motion detector.
+- **Sensors filter** on the **Rooms** tab, with tiles for sensors and on/off sensors.
+
+### Fixed
+- **Long names cut short by the Home Manager** (around 29 to 30 characters) are now matched correctly, so lights
+  and switches with long names are no longer missed or paired with the wrong objects.
+- **More reliable switch detection.** A switch is only suggested when both its on and off objects are found.
+- **The Rooms tab lost its search field and filters** after the first update of the page. They now stay.
+- The «Reset awnings» button is only created on the installation the app was built for.
+
 ## 3.0.0 (2026-11-03)
 
 Everything you see is now in English, so the app can be used outside Norway. Norwegian is kept where Home

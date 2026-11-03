@@ -33,10 +33,10 @@ configuration:
     description: Lager i tillegg en lys-enhet for av/på-bryterne som er lys (f.eks. taklamper), så de havner under Lys i Home Assistant og Google Home. Bryter-enhetene beholdes.
   awning_position:
     name: Markise-posisjon (tidsbasert)
-    description: Regner ut omtrentlig posisjon (0-100 %) fra kjøretiden, og lar Home Assistant sette posisjon direkte. Markise-innstillingene gjelder foreløpig bare markiser som er lagt inn i koden.
+    description: Regner ut omtrentlig posisjon (0-100 %) fra kjøretiden, og lar Home Assistant sette posisjon direkte. Gjelder alle markiser. Markiser du legger til på nettsiden får kjøretiden sin der.
   awning_runtime_balcony:
     name: Kjøretid, markise balkong (sekunder)
-    description: Tid fra helt inne til helt ute.
+    description: Tid fra helt inne til helt ute. De tre kjøretidene gjelder markisene som er lagt inn i koden. Markiser du legger til på nettsiden får kjøretiden sin der.
   awning_runtime_pavilion:
     name: Kjøretid, markise paviljong (sekunder)
   awning_runtime_hot_tub:

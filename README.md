@@ -82,6 +82,8 @@ try.
 |---|---|
 | 💡 **Dimmable lights** | Dimmers become `light` entities. Changes from a wall switch show up in under a second. |
 | 🔌 **On/off switches** | Patio heaters, fans, floodlights and other actuators become `switch` entities. |
+| ☀️ **Awnings** | Extend, retract and stop, with the position estimated from the running time you set. |
+| 🌡️ **Thermostats and sensors** | Room temperature and target temperature as `climate` entities. Temperature, light, wind and other values as sensors. Inputs such as door contacts can be on/off sensors. |
 | 🔘 **Wall buttons as smart buttons** | Short press, long press and release become events. Use them for music, scenes or anything else. |
 | 📡 **USB stick (optional)** | Lights are controlled directly over radio and react instantly. The Home Manager takes over if a dimmer does not answer. |
 | 🧠 **Learns by itself** | Finds the devices in the Home Manager, and finds which dimmers each light controls. No numbers to type in. |
@@ -137,7 +139,8 @@ Open **xComfort** in the sidebar. The first time, a guide welcomes you:
 <p align="center"><img src="images/devices.png" alt="Add devices" width="820"></p>
 
 1. Press **Start search**. The app goes through everything in the Home Manager (10 to 20 minutes, does not affect the radio).
-2. Give lights, switches and buttons a name and a room.
+2. Give each device a name and a room. Lights, switches, awnings, thermostats, sensors and buttons are listed
+   separately. For awnings you also set the running time, and for sensors the unit.
 3. Press **Add selected to Home Assistant**.
 
 Done. The devices are now under *Settings → Devices & services → MQTT*, sorted by room, ready to use like
@@ -150,7 +153,7 @@ anything else in Home Assistant.
 | Tab | What you find |
 |---|---|
 | **Home** | «Everything is working», or exactly what is wrong. Key numbers, awnings and a live list of everything happening in the house. |
-| **Rooms** | All devices by room. Click for on/off, drag to dim, «Turn all off» per room. The pencil changes name and room. |
+| **Rooms** | All devices by room, with filters for lights, switches, awnings, heating and sensors. Click for on/off, drag to dim, «Turn all off» per room. The pencil changes name and room, and for awnings the running time and direction. |
 | **Buttons** | All wall buttons with their last press. Press a new button in the house and it shows up here, ready to add with one click. |
 | **Devices** | Search the Home Manager, add new devices, find objects and download a backup. |
 | **USB stick** | Stick status, automatic learning of which dimmers each light controls, and troubleshooting. |
@@ -249,7 +252,7 @@ mode: single
 | Instant status | on | Keeps a connection open and receives changes in under a second. Required for buttons. |
 | Poll interval | `20` s | How often everything is read when instant status is off. |
 | Log level | `info` | `debug` logs all traffic to and from the Home Manager. |
-| Awning settings | | Running time, pauses and double stop. See [Limitations](#limitations). |
+| Awning settings | | Position, pauses and double stop for all awnings. Awnings you add get their running time on the web page. |
 
 The setting descriptions are shown in Norwegian when Home Assistant is set to Norwegian.
 
@@ -312,6 +315,8 @@ Feel free to run **Devices → Search again** afterwards, and download a new bac
 | Lights react slowly | See the response time on **Home**. Long times usually mean poor radio coverage or a long dimming time in MRF. The USB stick helps. |
 | The USB stick is not found | Check that it is plugged into the Home Assistant machine and that MRF is not using it. The app looks for it every 10 seconds. |
 | «No answer» from some lights while learning | They are probably out of range of the stick. They are still controlled through the Home Manager. Move the stick closer and try again. |
+| An awning goes the wrong way, or the position is off | Press the pencil on the awning under **Rooms**. Tick **Swap directions**, or adjust the running time (seconds from fully in to fully out). |
+| A sensor has the wrong unit | Press the pencil on the sensor under **Rooms** and choose the right unit. |
 | A button sends nothing | Is it a **General input** in xSetup, and uploaded? Does it show up under **Buttons** when you press it? |
 | Need more details | Set **Log level** to `debug`, repeat the problem, download the log from the web page and attach it to an issue. |
 
@@ -321,9 +326,13 @@ Feel free to run **Devices → Search again** afterwards, and download a new bac
 
 To be honest, this is what remains:
 
-- **The search finds lights, switches and buttons.** Awnings, thermostats and sensors are supported by the app,
-  but cannot be added from the web page yet. Have some and want to help? Open an issue with the names from
-  **Devices → Find an object**, and we will add it.
+- **Awning position is estimated** from the running time, since the awnings do not report where they are.
+  Run each awning fully in once after adding it, so the app knows where it starts.
+- **Light scenes** stored in the Home Manager are not available yet. Wall buttons and Home Assistant scenes work
+  fine in the meantime.
+- **The search recognises devices by the names xSetup gives them** (`D_`, `R_`, `TH_`, `TS_`, `IN_` and so on).
+  Something missing? Find it under **Devices → Find an object** (inputs can be added there directly), or open
+  an issue with the names you see there.
 - **Tested on one installation** (Sensio X1 / Home Manager with an extra controller). Other setups should work,
   but are not confirmed yet.
 - **The USB stick** is tested with the CKOZ-00/13, and uses the same commands MRF uses when you test a light.
