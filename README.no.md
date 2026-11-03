@@ -41,6 +41,7 @@
 - [Hvorfor](#hvorfor)
 - [Dette får du](#dette-får-du)
 - [Kom i gang på 10 minutter](#kom-i-gang-på-10-minutter)
+- [Docker (uten Home Assistant OS)](#docker-uten-home-assistant-os)
 - [Nettsiden](#nettsiden)
 - [USB-pinnen: lys på et øyeblikk](#usb-pinnen-lys-på-et-øyeblikk)
 - [Veggknapper i automasjoner](#veggknapper-i-automasjoner)
@@ -91,7 +92,8 @@ andre integrasjoner for dem.
 
 ### Dette trenger du
 
-- **Home Assistant OS eller Supervised.** Det er der apper (add-ons) finnes.
+- **Home Assistant OS eller Supervised.** Det er der apper (add-ons) finnes. Kjører du Home Assistant i
+  Docker? Se [Docker](#docker-uten-home-assistant-os).
 - **Mosquitto broker**-appen og **MQTT**-integrasjonen. Har du ikke det: *Innstillinger → Apper → Appbutikk →
   Mosquitto broker → Installer → Start*. HA foreslår så MQTT-integrasjonen av seg selv.
 - **En egen bruker til appen**, f.eks. `xcomfort`: *Innstillinger → Personer → Brukere → Legg til*. Mosquitto
@@ -138,6 +140,78 @@ Under fanen **Info**: slå på **Start ved oppstart**, **Watchdog** og **Vis i s
 
 Ferdig. Enhetene ligger nå under *Innstillinger → Enheter og tjenester → MQTT*, sortert per rom, og du kan
 bruke dem som alt annet i Home Assistant.
+
+---
+
+## Docker (uten Home Assistant OS)
+
+Kjører du Home Assistant i Docker (Container)? Da finnes ikke apper, men broen er en helt vanlig container og
+kan kjøre for seg selv. Du trenger en MQTT-broker (for eksempel Mosquitto i Docker) og **MQTT**-integrasjonen i
+Home Assistant.
+
+> Denne måten å kjøre den på er ny. Si fra i en issue hvis noe ikke virker.
+
+**1.** Lag en mappe, f.eks. `xcomfort`, med en undermappe `data` og fila `data/options.json`:
+
+```json
+{
+  "xcomfort_ip": "192.168.1.50",
+  "mqtt_host": "192.168.1.10",
+  "mqtt_port": 1883,
+  "mqtt_username": "xcomfort",
+  "mqtt_password": "mqtt-passordet-ditt",
+  "light_control": "hybrid"
+}
+```
+
+`xcomfort_ip` er Home Manager / Sensio X1, og `mqtt_host` er maskinen som kjører MQTT-brokeren (ikke
+`core-mosquitto`, det navnet finnes bare i Home Assistant OS). Alt annet fra [Innstillinger](#innstillinger)
+kan legges til med de samme navnene som i [config.yaml](xcomfort_bridge/config.yaml). Det du utelater får
+standardverdien.
+
+**2.** Lag `docker-compose.yml` i samme mappe:
+
+```yaml
+services:
+  xcomfort:
+    build: https://github.com/PolsaFH/xcomfort-ha.git#main:xcomfort_bridge
+    container_name: xcomfort-bridge
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    volumes:
+      - ./data:/data
+      - /etc/localtime:/etc/localtime:ro
+    # Bare hvis du har USB-pinnen (CKOZ-00/13):
+    # devices:
+    #   - /dev/bus/usb:/dev/bus/usb
+```
+
+**3.** Start den:
+
+```bash
+docker compose up -d --build
+docker compose logs -f
+```
+
+Docker bygger imaget rett fra dette repoet, så du trenger ikke laste ned noe først.
+
+**4.** Åpne `http://<ip-til-docker-maskinen>:8099` og følg veiviseren under **Devices**, akkurat som i
+Home Assistant OS.
+
+**Oppdater** til ny versjon med `docker compose up -d --build` igjen. Enhetene og innstillingene dine ligger i
+`data`-mappen og blir med videre.
+
+Greit å vite:
+
+- **Nettsiden har ingen innlogging** når den kjører utenfor Home Assistant. Alle på nettverket ditt kan åpne
+  den og styre lysene. Ikke gjør port 8099 tilgjengelig fra internett. Vil du bare nå den fra selve
+  Docker-maskinen, bruk `"127.0.0.1:8099:8099"`.
+- **USB-pinnen** må stå i før containeren starter. Setter du den i senere, start containeren på nytt med
+  `docker compose restart`.
+- **Vanlig `docker run`** virker også:
+  `docker run -d --name xcomfort-bridge --restart unless-stopped -p 8099:8099 -v "$PWD/data:/data" xcomfort-bridge`
+  etter `docker build -t xcomfort-bridge https://github.com/PolsaFH/xcomfort-ha.git#main:xcomfort_bridge`.
 
 ---
 
