@@ -1,5 +1,5 @@
 name: "xComfort MQTT Bridge"
-version: "3.1.0"
+version: "3.1.1"
 slug: "xcomfort_bridge"
 url: "https://github.com/PolsaFH/xcomfort-ha"
 description: "Local control of Eaton xComfort / Sensio through the Home Manager. No cloud. Optional USB stick for instant light control."

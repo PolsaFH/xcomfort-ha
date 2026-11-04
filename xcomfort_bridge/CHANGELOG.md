@@ -2,6 +2,15 @@
 
 From 3.0.0 the changelog is written in English. Older entries are in Norwegian.
 
+## 3.1.1 (2026-11-04)
+
+### Fixed
+- **Clear message when the Home Manager cannot be reached.** The Home tab used to say «Connected to the Home
+  Manager, but without a live connection» even when the app had no contact at all. It now says «Cannot reach
+  the Home Manager» and explains the likely cause (wrong IP address, wrong port, or the Home Manager is off).
+- The search on the Devices tab explains connection errors the same way instead of only showing the error code.
+- The welcome guide no longer marks «Connect» as done before the Home Manager has answered.
+
 ## 3.1.0 (2026-11-03)
 
 Awnings, thermostats and sensors can now be found and added from the web page, on any installation.

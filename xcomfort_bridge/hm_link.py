@@ -63,6 +63,7 @@ class HMLink:
         self.conn = None
         self.lock = threading.Lock()
         self.connected = False
+        self.last_error = ""     # siste feil ved tilkobling (vises paa nettsiden)
         self.last_rx = 0.0
         self.connects = 0
         self.frames = 0
@@ -123,6 +124,7 @@ class HMLink:
                 conn = xc.XComfortConn()
             except Exception as e:  # noqa: BLE001
                 self.connected = False
+                self.last_error = str(e)
                 log.warning("The listener connection could not reach Home Manager: %s (retrying in %.0fs)",
                             e, delay)
                 time.sleep(delay)
@@ -133,6 +135,7 @@ class HMLink:
             with self.lock:
                 self.conn = conn
             self.connected = True
+            self.last_error = ""
             self.connects += 1
             self.last_rx = time.time()
             self._buf = b""

@@ -47,7 +47,7 @@ import usbstick
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "3.1.0"
+BRIDGE_VERSION = "3.1.1"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -2330,6 +2330,22 @@ class Api:
             problems.append("the awning thread is stuck")
         return problems
 
+    @staticmethod
+    def hm_status():
+        """«ok» naar vi har kontakt med Home Manager, «feil» naar siste forsoek
+        feilet, «ukjent» rett etter start foer noe er forsoekt."""
+        if (LINK and (getattr(LINK, "connected", False) or LINK.healthy())) or STATS.hm_ok:
+            return "ok"
+        if (LINK and getattr(LINK, "last_error", "")) or STATS.last_error != "none":
+            return "feil"
+        return "ukjent"
+
+    @staticmethod
+    def hm_error():
+        if LINK and getattr(LINK, "last_error", ""):
+            return LINK.last_error
+        return "" if STATS.last_error == "none" else STATS.last_error
+
     def status(self):
         snap = STATS.snapshot(MARKISER_CTRL.queue_length())
         return {
@@ -2342,6 +2358,9 @@ class Api:
             "mqtt": MQTT_STATE["connected"],
             "mqtt_host": OPTS["mqtt_host"],
             "lytter_ok": bool(LINK and LINK.healthy()),
+            "hm_status": self.hm_status(),
+            "hm_adresse": f"{OPTS['xcomfort_ip']}:{OPTS['xcomfort_port']}",
+            "hm_feil": self.hm_error(),
             "usb": self.usb(),
             "siste_melding_sek": round(time.time() - LINK.last_rx) if LINK and LINK.last_rx else None,
             "sendt": snap["sent"], "feilet": snap["failed"], "siste_feil": snap["last_error"],

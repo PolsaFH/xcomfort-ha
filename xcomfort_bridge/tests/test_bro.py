@@ -1440,5 +1440,31 @@ class TestUsbOmsending(unittest.TestCase):
             fake.close()
 
 
+class TestHMStatus(unittest.TestCase):
+    """Nettsiden skal si tydelig fra naar Home Manager ikke svarer."""
+
+    def setUp(self):
+        self.fake = FakeHM()
+        self.bro, self.xc = load_bridge(self.fake)
+
+    def tearDown(self):
+        self.fake.close()
+
+    def test_ukjent_ok_og_feil(self):
+        api = self.bro.Api()
+        self.assertEqual(api.status()["hm_status"], "ukjent")
+        self.bro.open_hm("test").close()
+        st = api.status()
+        self.assertEqual(st["hm_status"], "ok")
+        self.assertEqual(st["hm_feil"], "")
+        self.xc.CONTROLLER_PORT = 1           # ingen lytter her: connection refused
+        with self.assertRaises(ConnectionError):
+            self.bro.open_hm("test", attempts=1)
+        st = api.status()
+        self.assertEqual(st["hm_status"], "feil")
+        self.assertIn("refused", st["hm_feil"].lower())
+        self.assertTrue(st["hm_adresse"].endswith(":%d" % self.bro.OPTS["xcomfort_port"]))
+
+
 if __name__ == "__main__":
     unittest.main()
