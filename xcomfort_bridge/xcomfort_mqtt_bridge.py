@@ -47,7 +47,7 @@ import usbstick
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "3.1.1"
+BRIDGE_VERSION = "3.1.2"
 
 # ------------------------------------------------------------ innstillinger --
 
@@ -2672,12 +2672,6 @@ def main():
     log.info("Starting xComfort MQTT bridge v%s (Home Manager %s:%s, MQTT %s:%s, log level %s)",
              BRIDGE_VERSION, OPTS["xcomfort_ip"], OPTS["xcomfort_port"],
              OPTS["mqtt_host"], OPTS["mqtt_port"], OPTS["log_level"])
-    log.info("Awnings: position=%s, runtimes=%s, gap=%.1fs, double stop=%s, repeat move=%s",
-             OPTS["awning_position"],
-             {m.name: m.runtime for m in MARKISER_CTRL.markiser.values()},
-             OPTS["awning_command_gap"], OPTS["awning_double_stop"],
-             OPTS["awning_repeat_move"])
-
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="xcomfort-bridge")
     MQTT_STATE["client"] = client
     client.suppress_exceptions = True
@@ -2694,6 +2688,12 @@ def main():
     apply_profile()
     start_usb_stick()
     load_extras()
+    if MARKISER_CTRL.markiser:
+        log.info("Awnings: position=%s, runtimes=%s, gap=%.1fs, double stop=%s, repeat move=%s",
+                 OPTS["awning_position"],
+                 {m.name: m.runtime for m in MARKISER_CTRL.markiser.values()},
+                 OPTS["awning_command_gap"], OPTS["awning_double_stop"],
+                 OPTS["awning_repeat_move"])
     ids = rebuild_registry()
     if OPTS["instant_status"]:
         LINK = hm_link.HMLink(on_hm_object, on_hm_ack, on_hm_other)

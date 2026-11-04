@@ -531,6 +531,7 @@ async function loadNewButtons(){
 }
 
 /* ---------- enheter ---------- */
+let scanLock=0;
 const KINDS=[["lys","Dimmable lights","bulb"],["brytere","On/off switches","power"],["markiser","Awnings","blind"],["termostater","Thermostats","thermo"],["sensorer","Sensors","wave"],["knapper","Buttons and inputs","btn"]];
 const KIND_HINT={markiser:"Running time is how many seconds the awning takes from fully in to fully out. You can adjust it later, and swap the directions if they are the wrong way round.",
   sensorer:"The unit is a guess from the name. Check it before adding.",
@@ -548,7 +549,10 @@ async function loadEnheter(){
   const s=scanInfo=await api("api/scan"),st=s.status,c=s.kandidater;if(Array.isArray(s.enheter))UNITS=s.enheter;
   $("#scanstat").innerHTML=st.running?`<div class="progress"><div style="width:${Math.round(st.progress*100)}%"></div></div><div class="small muted">${Math.round(st.progress*100)} % · ${st.found} objects found so far</div>`
     :`<div class="row"><button class="btn pri" id="scan">${ic("wave")}${st.finished?"Search again":"Start search"}</button><span class="small muted">${st.finished?`Last run ${esc(st.finished)} · ${st.objects} objects`:"Not run yet"}</span></div>${st.error?`<div class="small mt" style="color:var(--err)">The search stopped. ${/refused|timed out|timeout|errno|unreachable|no route|getaddrinfo/i.test(st.error)?hmHelp(st.error):"Error: "+esc(st.error)}</div>`:""}`;
-  const sb=$("#scan");if(sb)sb.onclick=async()=>{sb.disabled=true;await post("api/scan/start");toast("The search has started");loadEnheter()};
+  const sb=$("#scan");if(sb){sb.disabled=Date.now()<scanLock;sb.onclick=async()=>{
+    if(S&&S.hm_status==="feil")return toast("No contact with the Home Manager. See the message on the Home tab.",true);
+    sb.disabled=true;scanLock=Date.now()+5000;setTimeout(loadEnheter,5100);
+    const r=await post("api/scan/start");r.ok?toast("The search has started"):toast("A search was just started. Wait a few seconds.",true);loadEnheter()}}
   const keep={};$$("#kand [data-k]").forEach(r=>keep[r.dataset.k]=readRow(r));
   const open=KINDS.map(([k])=>({k,arr:(c[k]||[]).filter(x=>!x.lagt_til)}));
   const n=open.reduce((a,x)=>a+x.arr.length,0);

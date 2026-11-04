@@ -1465,6 +1465,16 @@ class TestHMStatus(unittest.TestCase):
         self.assertIn("refused", st["hm_feil"].lower())
         self.assertTrue(st["hm_adresse"].endswith(":%d" % self.bro.OPTS["xcomfort_port"]))
 
+    def test_sok_startes_ikke_mange_ganger(self):
+        sc = self.bro.SCANNER
+        self.xc.CONTROLLER_PORT = 1            # feiler med en gang, som hos en tester
+        self.assertTrue(sc.start(max_id=5))
+        time.sleep(0.3)
+        self.assertFalse(sc.running)
+        self.assertFalse(sc.start(max_id=5))   # rett etter: ignoreres
+        sc._last_start -= self.bro.scanner.START_GAP_S
+        self.assertTrue(sc.start(max_id=5))
+
 
 if __name__ == "__main__":
     unittest.main()

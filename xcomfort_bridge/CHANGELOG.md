@@ -2,6 +2,13 @@
 
 From 3.0.0 the changelog is written in English. Older entries are in Norwegian.
 
+## 3.1.2 (2026-11-04)
+
+### Fixed
+- Pressing **Search** many times in a row no longer starts the search over and over. It is also blocked while
+  there is no contact with the Home Manager.
+- The awning settings are only written to the log when the installation has awnings.
+
 ## 3.1.1 (2026-11-04)
 
 ### Fixed

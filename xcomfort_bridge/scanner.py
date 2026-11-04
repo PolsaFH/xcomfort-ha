@@ -24,6 +24,7 @@ log = logging.getLogger("xcomfort.scan")
 NAME_TYPE_RE = re.compile(r"(?:SSN|RSN) (\d+) (\S+) (\d+)")
 
 MAX_ID = 270000
+START_GAP_S = 5.0     # minste tid mellom to soek-starter
 EMPTY_GAP = 30000
 HARD_LIMIT = 1000000
 BATCH = 100
@@ -39,6 +40,7 @@ class Scanner:
         self.started = None
         self.finished = None
         self.error = None
+        self._last_start = 0.0
         self.objects = self._load()
 
     def _load(self):
@@ -60,8 +62,11 @@ class Scanner:
                 "error": self.error}
 
     def start(self, max_id=MAX_ID):
-        if self.running:
+        # Ikke start paa nytt mens et soek kjoerer, eller rett etter et som
+        # feilet (f.eks. mange trykk paa knappen naar Home Manager ikke svarer).
+        if self.running or time.time() - self._last_start < START_GAP_S:
             return False
+        self._last_start = time.time()
         threading.Thread(target=self._run, args=(max_id,), daemon=True, name="skann").start()
         return True
 
