@@ -47,7 +47,7 @@ import usbstick
 import web
 import xcomfort_local_control as xc
 
-BRIDGE_VERSION = "3.1.2"
+BRIDGE_VERSION = "3.1.3"
 
 # ------------------------------------------------------------ innstillinger --
 

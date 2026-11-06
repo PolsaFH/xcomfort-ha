@@ -534,12 +534,12 @@ async function loadNewButtons(){
 let scanLock=0;
 const KINDS=[["lys","Dimmable lights","bulb"],["brytere","On/off switches","power"],["markiser","Awnings","blind"],["termostater","Thermostats","thermo"],["sensorer","Sensors","wave"],["knapper","Buttons and inputs","btn"]];
 const KIND_HINT={markiser:"Running time is how many seconds the awning takes from fully in to fully out. You can adjust it later, and swap the directions if they are the wrong way round.",
-  sensorer:"The unit is a guess from the name. Check it before adding.",
-  knapper:"Inputs (IN_) can be added as a button (events for automations) or as an on/off sensor, for example a door contact or a motion detector."};
+  sensorer:"The unit is a guess from the name. Check it before adding. «Device temperature» is the temperature inside a dimmer or relay, not the room, so those are not selected.",
+  knapper:"Inputs (IN_) can be added as a button (events for automations) or as an on/off sensor, for example a door contact or a motion detector. Motion detectors and door contacts are suggested as sensors."};
 function candExtra(k,x,kp){
   if(k==="markiser")return `<input type="number" class="sm rt" min="1" max="300" step="0.5" value="${esc(kp.runtime??30)}" title="Running time in seconds, fully in to fully out" aria-label="Running time in seconds">`;
   if(k==="sensorer")return `<select class="sm un" title="Unit" aria-label="Unit">${unitOpts(kp.enhet??x.enhet??"")}</select>`;
-  if(k==="knapper"&&/^IN_/.test(x.objekt||""))return `<select class="sm som" title="Add as" aria-label="Add as"><option value="knapp">Button</option><option value="sensor" ${kp.som==="sensor"?"selected":""}>On/off sensor</option></select>`;
+  if(k==="knapper"&&/^IN_/.test(x.objekt||""))return `<select class="sm som" title="Add as" aria-label="Add as"><option value="knapp">Button</option><option value="sensor" ${(kp.som??x.som)==="sensor"?"selected":""}>On/off sensor</option></select>`;
   return "";
 }
 function readRow(r){const o={navn:r.querySelector(".nv").value,sone:r.querySelector(".sv").value,på:r.querySelector("input[type=checkbox]").checked};
@@ -561,12 +561,12 @@ async function loadEnheter(){
   if($("#kand").dataset.sig===sig)return;   // ikke tegn på nytt mens man skriver
   $("#kand").dataset.sig=sig;
   $("#kand").innerHTML=open.filter(x=>x.arr.length).map(({k,arr})=>{const[,title,icn]=KINDS.find(x=>x[0]===k);
-    return `<div class="mt"><div class="cand-hd">${ic(icn)}<h3>${title} <span class="muted small">(${arr.length})</span></h3><label class="small muted row" style="gap:6px"><input type="checkbox" data-all="${k}" checked> select all</label></div>
+    return `<div class="mt"><div class="cand-hd">${ic(icn)}<h3>${title} <span class="muted small">(${arr.length})</span></h3><label class="small muted row" style="gap:6px"><input type="checkbox" data-all="${k}" ${arr.some(x=>x.intern)?"":"checked"}> select all</label></div>
     ${KIND_HINT[k]?`<div class="small muted" style="margin:2px 0 6px">${KIND_HINT[k]}</div>`:""}
     ${arr.map(x=>{const id=k+":"+x.id,kp=keep[id]||{},m=/^IN_([^_]+)_(.+)$/.exec(x.objekt||"");
       if(m&&kp.navn==null){kp.navn=x.navn.startsWith(m[1]+" ")?x.navn.slice(m[1].length+1):x.navn;kp.sone=m[1]}
       if(k==="termostater"&&kp.sone==null&&x.sone)kp.sone=x.sone;
-      return `<div class="item" data-k="${id}"><input type="checkbox" ${kp.på===false?"":"checked"} data-kind="${k}" aria-label="Select ${esc(x.navn)}"><div class="tx"><span class="small muted">${esc(x.objekt)} · no. ${x.id}</span></div>
+      return `<div class="item" data-k="${id}"><input type="checkbox" ${(kp.på??!x.intern)?"checked":""} data-kind="${k}" aria-label="Select ${esc(x.navn)}"><div class="tx"><span class="small muted">${esc(x.objekt)} · no. ${x.id}</span></div>
       <input type="text" class="sm nv" value="${esc(kp.navn??x.navn)}" placeholder="Name" aria-label="Name"><input type="text" class="sm sv" list="romliste" value="${esc(kp.sone??"")}" placeholder="Room" aria-label="Room">${candExtra(k,x,kp)}</div>`}).join("")}</div>`}).join("")
     +`<div class="row mt"><button class="btn pri" id="addsel">Add selected to Home Assistant</button><span class="small muted">Without a room they end up under «New devices».</span></div>`;
   $$("#kand [data-all]").forEach(cb=>cb.onchange=()=>$$(`#kand [data-kind=${cb.dataset.all}]`).forEach(x=>x.checked=cb.checked));

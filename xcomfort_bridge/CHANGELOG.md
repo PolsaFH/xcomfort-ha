@@ -2,6 +2,19 @@
 
 From 3.0.0 the changelog is written in English. Older entries are in Norwegian.
 
+## 3.1.3 (2026-11-06)
+
+### Fixed
+- **On/off lights (R_) were not found on some installations.** The search expected the on and off objects close
+  to the light, but on some installations they are further away. The search now looks at everything that belongs
+  to the device, up to the next device. Thanks to the first tester for the object list.
+
+### Improved
+- Sensors that measure the temperature inside a dimmer or relay are now called «device temperature» and are not
+  selected by default, so they don't fill up Home Assistant.
+- Inputs that look like motion detectors or door contacts (PIR, door, window, contact) are suggested as on/off
+  sensors instead of buttons.
+
 ## 3.1.2 (2026-11-04)
 
 ### Fixed

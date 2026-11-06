@@ -1440,6 +1440,55 @@ class TestUsbOmsending(unittest.TestCase):
             fake.close()
 
 
+class TestSkannerAndreAnlegg(unittest.TestCase):
+    """Mønstre fra en testers anlegg (anonymisert): av/på-objektene ligger
+    lenger unna enn hos forfatteren, fordi det er et temperaturobjekt imellom."""
+
+    def objekter(self):
+        o = {}
+        for base, navn in ((6000, "TakRomEn"), (7063, "TakRomTo")):
+            o[base] = (f"R_{navn}", 8)
+            o[base + 113] = (f"S_{navn}Temp", 10)
+            o[base + 262] = (f"B_R_{navn}_ON", 6)
+            o[base + 338] = (f"B_R_{navn}_OFF", 6)
+            o[base + 414] = (f"B_R_{navn}_Sc1", 6)
+        o[9000] = ("D_SpotGang", 21)
+        o[9070] = ("S_SpotGangTemp", 10)
+        o[9118] = ("M_D_SpotGang_Val", 23)
+        o[9166] = ("B_D_SpotGang_SET", 6)
+        o[9500] = ("TS_Utetemperatur", 10)
+        o[9600] = ("IN_GangPIRKA", 11)
+        o[9671] = ("IN_Inngang", 11)
+        return o
+
+    def test_av_paa_med_lang_avstand(self):
+        c = scanner_mod().candidates(self.objekter(), set())
+        sw = {x["objekt"]: (x["on_id"] - x["id"], x["off_id"] - x["id"]) for x in c["brytere"]}
+        self.assertEqual(sw, {"R_TakRomEn": (262, 338), "R_TakRomTo": (262, 338)})
+
+    def test_stopper_ved_neste_enhet(self):
+        o = self.objekter()
+        del o[6000 + 338]                      # første mangler OFF: skal IKKE låne fra neste
+        c = scanner_mod().candidates(o, set())
+        self.assertEqual([x["objekt"] for x in c["brytere"]], ["R_TakRomTo"])
+
+    def test_enhetstemperatur_og_bevegelsessensor(self):
+        c = scanner_mod().candidates(self.objekter(), set())
+        sens = {x["objekt"]: x for x in c["sensorer"]}
+        self.assertTrue(sens["S_SpotGangTemp"].get("intern"))
+        self.assertTrue(sens["S_TakRomEnTemp"].get("intern"))
+        self.assertIn("device temperature", sens["S_SpotGangTemp"]["navn"])
+        self.assertFalse(sens["TS_Utetemperatur"].get("intern"))
+        som = {x["objekt"]: x.get("som") for x in c["knapper"]}
+        self.assertEqual(som, {"IN_GangPIRKA": "sensor", "IN_Inngang": None})
+
+
+def scanner_mod():
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import scanner
+    return scanner
+
+
 class TestHMStatus(unittest.TestCase):
     """Nettsiden skal si tydelig fra naar Home Manager ikke svarer."""
 

@@ -168,13 +168,29 @@ def _awning_objects(objects, oid, key):
     return found
 
 
+MAIN_TYPES = (T_DIMMER, T_SWITCH, T_THERMOSTAT, T_INPUT)   # starten på en ny enhet
+SWITCH_WINDOW = 800      # av/på-objektene kan ligge langt etter (f.eks. +262/+338 med temperaturobjekt imellom)
+
+
+def _own_objects(objects, oid, limit=SWITCH_WINDOW):
+    """Objektene som hører til enheten `oid`: alt etter den, fram til neste
+    hovedobjekt (dimmer, av/på, termostat eller inngang) eller `limit`."""
+    out = []
+    for i in range(oid + 1, oid + limit + 1):
+        if i in objects:
+            if objects[i][1] in MAIN_TYPES:
+                break
+            out.append((i, objects[i][0]))
+    return out
+
+
 def _switch_objects(objects, oid, name):
     """(on_id, off_id) for en av/på-aktuator, eller None. To mønstre er sett:
     R_<navn>  -> B_R_<navn>_ON / B_R_<navn>_OFF (navnene kan være kuttet)
     TS_<navn><sone> -> B_<sone>_<navn>_On / B_<sone>_<navn>_Off"""
     core = name.split("_", 1)[1]
     hits = []
-    for i, n in _following(objects, oid):
+    for i, n in _own_objects(objects, oid):
         low = n.lower()
         if low in (f"b_{core}_on".lower(), f"b_{core}_off".lower(),
                    f"b_r_{core}_on".lower(), f"b_r_{core}_off".lower()):
@@ -195,6 +211,26 @@ def _switch_objects(objects, oid, name):
         if len(cut) >= 2 and on is None and off is None:
             on, off = cut[0], cut[1]
     return (on, off) if on and off else None
+
+
+SENSOR_INPUT_RE = re.compile(r"pir|beveg|motion|d[oø]r|door|vindu|window|kontakt|contact", re.I)
+
+
+def _has_device(objects, base):
+    """True hvis det finnes en dimmer eller av/på-aktuator med dette navnet."""
+    names = _device_names(objects)
+    return f"D_{base}" in names or f"R_{base}" in names
+
+
+_names_cache = {}
+
+
+def _device_names(objects):
+    key = id(objects), len(objects)
+    if key not in _names_cache:
+        _names_cache.clear()
+        _names_cache[key] = {n for n, t in objects.values() if t in (T_DIMMER, T_SWITCH)}
+    return _names_cache[key]
 
 
 def guess_unit(name):
@@ -236,13 +272,22 @@ def candidates(objects, known_ids):
                 out["brytere"].append({"id": oid, "navn": pretty(name.split("_", 1)[1]), "objekt": name,
                                        "on_id": sw[0], "off_id": sw[1]})
         elif typ == T_INPUT and name.startswith("IN_"):
-            out["knapper"].append({"id": oid, "navn": pretty(name[3:]), "objekt": name})
+            item = {"id": oid, "navn": pretty(name[3:]), "objekt": name}
+            if SENSOR_INPUT_RE.search(name[3:]):
+                item["som"] = "sensor"      # bevegelsessensor, dørkontakt o.l.: forslag om av/på-sensor
+            out["knapper"].append(item)
         elif typ == T_THERMOSTAT and name.startswith("TH_"):
             room = pretty(name[3:].rstrip("0123456789"))
             out["termostater"].append({"id": oid, "navn": room or pretty(name[3:]), "objekt": name, "sone": room})
         elif typ == T_SENSOR and (name.startswith("TS_") or name.startswith("S_")):
             raw = name.split("_", 1)[1]
-            out["sensorer"].append({"id": oid, "navn": pretty(raw), "objekt": name, "enhet": guess_unit(raw)})
+            item = {"id": oid, "navn": pretty(raw), "objekt": name, "enhet": guess_unit(raw)}
+            base = raw[:-4] if raw.endswith("Temp") else None
+            if name.startswith("S_") and base and _has_device(objects, base):
+                # Temperaturen inne i en aktuator (D_<navn>/R_<navn>), ikke romtemperatur
+                item["navn"] = pretty(base) + " device temperature"
+                item["intern"] = True
+            out["sensorer"].append(item)
     return out
 
 
